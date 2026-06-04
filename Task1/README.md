@@ -1,6 +1,6 @@
 # Task: GCC vs RISC-V Output Verification 
 
-> **Objective:** Write a simple C program, compile and run it using standard GCC to verify correctness, then cross-compile the same program using the RISC-V toolchain and simulate it using Spike — confirming that both produce identical outputs. Additionally, analyze the compiled RISC-V binary using `objdump` to study the assembly instructions and count the number of instructions in `main` based on memory addresses.
+> **Objective:** Write a simple C program, compile and run it using standard GCC to verify correctness, then cross-compile the same program using the RISC-V toolchain and simulate it using Spike — confirming that both produce identical outputs. Additionally, analyze the compiled RISC-V binary using `objdump` to study the assembly instructions.
 
 ---
 
@@ -121,6 +121,10 @@ The output **matches the GCC output exactly**, confirming that the RISC-V toolch
 
 ![Spike n=12](screenshots/ss4.png)
 
+**Final source code confirmed via `cat` (`n=12`):**
+
+![cat sum1ton.c](screenshots/ss5.png)
+
 ---
 
 ##  Step 4: Disassembly & Instruction Count Analysis
@@ -148,7 +152,7 @@ riscv64-unknown-elf-objdump -d sum1ton.o | less
    101ac:   00008067    ret
 ```
 
-![Objdump O1 Disassembly](screenshots/ss5.png)
+![Objdump O1 Disassembly](screenshots/ss6.png)
 
 ### Disassembly of `main` (Ofast Optimization)
 
@@ -167,7 +171,7 @@ riscv64-unknown-elf-objdump -d sum1ton.o | less
    100d8:   00008067    ret
 ```
 
-![Objdump Ofast Disassembly](screenshots/ss6.png)
+![Objdump Ofast Disassembly](screenshots/ss7.png)
 
 ---
 
@@ -238,18 +242,20 @@ Write C Program (sum1ton.c)
 
 ---
 
-##  Screenshots Reference
+## 📸 Screenshots Reference
 
 | # | Screenshot | Description |
 |---|------------|-------------|
-| ss1 | ![](screenshots/1.png) | Writing & debugging `sum1ton.c` on VirtualBox using Leafpad; initial GCC errors and fixes |
-| ss2 | ![](screenshots/2.png) | Successful GCC compile and execution on VirtualBox — output: `The sum of 5 numbers is: 15` |
-| ss3 | ![](screenshots/ss1.png) | Navigating to `vsd-riscv2/samples` in Codespaces; GCC compile and run — output: `Sum from 1 to 9 is 45` |
-| ss4 | ![](screenshots/ss2.png) | Full Codespaces session: GCC run + RISC-V cross-compile + Spike simulation — both output `Sum from 1 to 9 is 45` |
-| ss5 | ![](screenshots/ss3.png) | Gedit editor showing `sum1ton.c` with `n=9`; Spike simulation confirming match |
-| ss6 | ![](screenshots/ss4.png) | Updated `n=12`; Spike output: `Sum from 1 to 12 is 78`; `cat` confirms final source |
-| ss7 | ![](screenshots/ss5.png) | `objdump` disassembly — `main` section under O1 optimization with addresses |
-| ss8 | ![](screenshots/ss6.png) | `objdump` disassembly — `main` section under Ofast optimization; address-based instruction count analysis |
+| 1 | ![](screenshots/1.png) | Writing & debugging `sum1ton.c` on VirtualBox using Leafpad; initial GCC errors and fixes |
+| 2 | ![](screenshots/2.png) | Successful GCC compile and execution on VirtualBox — output: `The sum of 5 numbers is: 15` |
+| ss1 | ![](screenshots/ss1.png) | Navigating to `vsd-riscv2/samples` in Codespaces; GCC compile and run — output: `Sum from 1 to 9 is 45` |
+| ss2 | ![](screenshots/ss2.png) | Full Codespaces session: GCC run + RISC-V cross-compile + Spike simulation — both output `Sum from 1 to 9 is 45` |
+| ss3 | ![](screenshots/ss3.png) | Gedit editor showing `sum1ton.c` with `n=9`; Spike simulation confirming match |
+| ss4 | ![](screenshots/ss4.png) | Updated `n=12`; Spike output: `Sum from 1 to 12 is 78` |
+| ss5 | ![](screenshots/ss5.png) | Final source code confirmed via `cat sum1ton.c` with `n=12` |
+| ss6 | ![](screenshots/ss6.png) | `objdump` disassembly — `main` section under O1 optimization with addresses |
+| ss7 | ![](screenshots/ss7.png) | `objdump` disassembly — `main` section under Ofast optimization; address-based instruction count analysis |
 
 ---
 
+*VSD RISC-V Internship | June 2026*
