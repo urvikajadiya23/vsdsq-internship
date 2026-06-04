@@ -1,4 +1,4 @@
-# RISC-V Workshop: GCC vs RISC-V Output Verification 
+# Task: GCC vs RISC-V Compilation & Output Verification
 
 > **Objective:** Write a simple C program, compile and run it using standard GCC to verify correctness, then cross-compile the same program using the RISC-V toolchain and simulate it using Spike — confirming that both produce identical outputs. Additionally, analyze the compiled RISC-V binary using `objdump` to study the assembly instructions.
 
