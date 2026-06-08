@@ -1,5 +1,4 @@
-# vsdsq-internship
-# # VSDSquadron RISC-V Internship
+# VSDSquadron RISC-V Internship
 
 **Name:** Urvika Jadiya  
 **Email:** 24uec241@lnmiit.ac.in  
@@ -16,6 +15,8 @@ This repository serves as the official documentation of tasks completed during t
 
 | Task | Title | 
 |------|-------|
-| [Task 1](./Task1/) | GCC vs RISC-V Compilation & Output Verification
+| [Task 1](./Task1/) | GCC vs RISC-V Compilation & Output Verification |
+| [Task 2](./Task2/) | Traffic Light Controller — O1 vs Ofast Analysis &  Spike Debugger | 
 
+---
 
