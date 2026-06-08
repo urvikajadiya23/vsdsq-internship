@@ -2,7 +2,7 @@
 
 > **Objective:** This task is divided into two distinct parts:
 >
-> **Part 1 — Traffic Light Controller:** Write a Traffic Light Controller program in C simulating RED → GREEN → YELLOW state transitions. Compile and verify using GCC, cross-compile using the RISC-V toolchain, simulate using Spike, and analyze the binary using `objdump` under `-O1` and `-Ofast` optimization levels — demonstrating how aggressive compiler optimization reduces instruction count when inputs are compile-time constants.
+> **Part 1 — Traffic Light Controller:** Write a Traffic Light Controller program in C simulating RED → GREEN → YELLOW state transitions. Compile and verify using GCC, cross-compile using the RISC-V toolchain, simulate using Spike, and analyze the binary using `objdump` under `-O1` and `-Ofast` optimization levels — demonstrating how aggressive compiler optimization reduces instruction count when inputs are compile-time constants. 
 >
 > **Part 2 — Spike Debugger Analysis:** Debug the `sum1ton` program using Spike's interactive debug mode (`spike -d`) to step through instructions and inspect register values — specifically analyzing how the `lui` and `addi` instructions work together to construct 32-bit addresses, and how the stack pointer (`sp`) is managed during function execution in RISC-V architecture.
 
