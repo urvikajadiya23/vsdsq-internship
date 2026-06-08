@@ -16,7 +16,7 @@ This repository serves as the official documentation of tasks completed during t
 | Task | Title | 
 |------|-------|
 | [Task 1](./Task1/) | GCC vs RISC-V Compilation & Output Verification |
-| [Task 2](./Task2/) | Traffic Light Controller — O1 vs Ofast Analysis &  Spike Debugger | 
+| [Task 2](./Task2/) | Traffic Light Controller — GCC & RISC-V compilation &  Spike Debugger | 
 
 ---
 
