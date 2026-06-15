@@ -1,4 +1,4 @@
-# Task 1 — Environment Setup & RISC-V Reference Bring-Up
+# Task 3 — Environment Setup & RISC-V Reference Bring-Up
 
 ---
 
