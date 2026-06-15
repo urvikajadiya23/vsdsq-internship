@@ -328,7 +328,7 @@ void clear_screen() {
 
 ![w_optional1](screenshots/w.optional1.png)
 
-**Screenshot — nano after modification (printf "VSDSq"):**
+**Screenshot — nano after modification (printf "VSDSq") and rebuilding:**
 
 ![w_optional3](screenshots/w.optional3.png)
 
