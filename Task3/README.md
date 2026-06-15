@@ -11,8 +11,6 @@ This task focuses on:
 - Understanding the RISC-V execution flow
 - Preparing for upcoming FPGA and IP development work
 
-> This is **not** an FPGA programming task yet.
-
 ---
 
 ## Step 1 — Set Up GitHub Codespace
