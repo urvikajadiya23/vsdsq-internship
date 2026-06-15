@@ -326,11 +326,11 @@ void clear_screen() {
 
 **Screenshot — nano showing original file (before modification):**
 
-![w_optional1](screenshots/w_optional1.png)
+![w_optional1](screenshots/w.optional1.png)
 
 **Screenshot — nano after modification (printf "VSDSq"):**
 
-![w_optional3](screenshots/w_optional3.png)
+![w_optional3](screenshots/w.optional3.png)
 
 ---
 
@@ -338,15 +338,20 @@ void clear_screen() {
 
 ```bash
 cd ~/vsdfpga_labs/basicRISCV/Firmware
+make clean
 make riscv_logo.bram.hex
 cd ~/vsdfpga_labs/basicRISCV/RTL
 make clean
 make build
 ```
 
-**Screenshot — Full rebuild pipeline on VSD VM after modification:**
+**Screenshot — First rebuild: nano + make riscv_logo.bram.hex + make build initiated (synthesis begins):**
 
-![w_optional](screenshots/w_optional.png)
+![w.optional](screenshots/w.optional.png)
+
+**Screenshot — Second rebuild: make clean + make riscv_logo.bram.hex + cd RTL + make clean + make build (yosys + nextpnr running):**
+
+![w_optional2](screenshots/w.optional2.png)
 
 ---
 
