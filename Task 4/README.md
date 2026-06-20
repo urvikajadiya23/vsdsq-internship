@@ -221,6 +221,9 @@ The GPIO Output IP (`gpio_ip.v`) was validated using a dedicated Verilog testben
 
 ---
 
+**Exploring the pre-installed firmware directory**
+![Exploring existing firmware](screenshots/ss23.png)
+
 ## Testbench Design
 
 The testbench instantiates the GPIO IP, generates a 10ns-period clock, dumps a VCD file for GTKWave, and drives a sequence of writes to validate write/readback behavior.
