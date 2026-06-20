@@ -16,7 +16,7 @@ Before writing any RTL, explored the existing basicRISCV SoC (`riscv.v`, `emitte
 
 ## Key Findings
 
-**Directory + top-level view.** Located inside `~/vsdfpga_labs/basicRISCV/RTL`, with `riscv.v` as the SoC top file. Running `head -50 riscv.v` shows the `Memory` module first — it exposes the core bus signals every peripheral connects to: `mem_addr`, `mem_wdata`, `mem_rdata`, `mem_wstrb`/`mem_wmask`, and `mem_rstrb`.
+**Directory + top-level view.** Located inside `~/vsdfpga_labs/basicRISCV/RTL`, with `riscv.v` as the SoC top file. Running `head -50 riscv.v` shows the `Memory` module first — it exposes the core RAM bus signals: `mem_addr`, `mem_wdata`, `mem_rdata`, `mem_wmask`, and `mem_rstrb`. `mem_wstrb` is a separate top-level signal (outside the `Memory` module) used specifically as the write strobe for IO peripherals.
 ![](screenshots/ss1.png)
 ![](screenshots/ss2a.png)
 ![](screenshots/ss2b.png)
@@ -51,7 +51,7 @@ This showed that adding any new peripheral needs three things: a free decode bit
 ![](screenshots/ss6.png)
 ![](screenshots/ss7.png)
 
-This exploration directly shaped the GPIO IP design: assigned the next free decode bit (`IO_GPIO_bit = 3`), reused the exact LEDS write-enable pattern (`isIO & mem_wstrb & mem_wordaddr[IO_GPIO_bit]`), and added a new entry to the `IO_rdata` read mux for GPIO readback — following the same structure already used for UART status.
+This exploration directly shaped the GPIO IP design: assigned the next free decode bit (`IO_GPIO_bit = 3`), followed the same decode-bit/write-strobe/read-mux structure as LEDs — though at the top level only `gpio_sel = isIO & mem_wordaddr[IO_GPIO_bit]` is formed, with the `mem_wstrb` AND happening inside the GPIO module itself rather than at the top level like LEDs — and added a new entry to the `IO_rdata` read mux for GPIO readback, following the same structure already used for UART status.
 
 # Step 2: Write the IP RTL
 
@@ -118,7 +118,7 @@ With `gpio_ip.v` complete and verified by inspection, the next step was instanti
 # Step 3: Integrate the GPIO IP into the SoC
 
 ## Objective
-The GPIO Output IP (`gpio_ip.v`) was integrated into the SoC top-level (`riscv.v`) by adding an address-decode slot, instantiating the IP, wiring it to the shared CPU bus, and exposing its output as a top-level port. Screenshots below follow the actual order in which the integration was implemented and verified.
+The GPIO Output IP (`gpio_ip.v`) was integrated into the SoC top-level (`riscv.v`) by adding an address-decode slot, instantiating the IP, wiring it to the shared CPU bus, and exposing its output as a top-level port.
 
 ## Files Involved
 - `riscv.v` — SoC top-level (includes `gpio_ip.v`, instantiates the IP, handles address decode and bus muxing)
