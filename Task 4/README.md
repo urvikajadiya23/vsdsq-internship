@@ -1,4 +1,4 @@
-# Task 2: Design & Integrate Your First Memory-Mapped IP
+# Task 4: Design & Integrate Your First Memory-Mapped IP
 
 **IP built:** Simple GPIO Output IP (Write-Only)
 **SoC:** `basicRISCV` (femtorv32-based RISC-V core), `vsdfpga_labs` repository
@@ -117,7 +117,7 @@ With `gpio_ip.v` complete and verified by inspection, the next step was instanti
 
 # Step 3: Integrate the GPIO IP into the SoC
 
-## Overview
+## Objective
 The GPIO Output IP (`gpio_ip.v`) was integrated into the SoC top-level (`riscv.v`) by adding an address-decode slot, instantiating the IP, wiring it to the shared CPU bus, and exposing its output as a top-level port. Screenshots below follow the actual order in which the integration was implemented and verified.
 
 ## Files Involved
