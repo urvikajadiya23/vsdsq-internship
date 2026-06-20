@@ -323,3 +323,25 @@ Simulation confirms the GPIO IP correctly implements:
 - Proper gating via `gpio_sel` (no update when not selected)
 
 This satisfies the mandatory simulation validation requirement for Step 4.
+
+## Short explanation:
+## 1. Address Used
+
+- `0x00400020` (for the GPIO IP module) or `0x00400010` (for LEDs)
+- Bit 22 is set to `1` to signal an I/O operation rather than a standard RAM access
+
+## 2. How the CPU Accesses the IP
+
+The CPU uses Memory-Mapped I/O (MMIO) via standard assembly commands (`lw` and `sw`):
+
+- **Address Decoding:** The system isolates the request because `mem_addr[22]` is high (`isIO = 1`)
+- **Device Selection:** Word address indexing bits selectively activate the GPIO block (`gpio_sel = 1`)
+- **Data Transfer:**
+  - **Write (`sw`):** Captures the data bus value and updates the internal register to drive output pins
+  - **Read (`lw`):** Muxes the register value back onto the main CPU data return bus
+
+## 3. What Was Validated in Simulation
+
+- **Toolchain Operation:** Confirmed assembly source files compile and map correctly to the execution hex pattern
+- **Bus Routing:** Verified the hardware address decoder smoothly separates RAM operations from I/O targets
+- **Peripheral Read/Write:** Validated that the core can write data out to alter external pin states and accurately read back those settings over the interface
