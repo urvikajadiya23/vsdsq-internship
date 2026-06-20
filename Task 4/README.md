@@ -126,7 +126,7 @@ The GPIO Output IP (`gpio_ip.v`) was integrated into the SoC top-level (`riscv.v
 
 ---
 
-**Figure 1 — Checking the existing IO address map (`localparam IO_*_bit`)**
+**Checking the existing IO address map (`localparam IO_*_bit`)**
 
 ![IO address map](screenshots/step3_ss13.png)
 
@@ -134,7 +134,7 @@ Before integrating, the existing one-hot IO bit map was checked with `grep -n "l
 
 ---
 
-**Figure 2 — Verifying `gpio_out` wiring (`grep -n "gpio_read\|gpio_out" riscv.v`)**
+**Verifying `gpio_out` wiring (`grep -n "gpio_read\|gpio_out" riscv.v`)**
 
 ![gpio_out wiring check](screenshots/ss14.png)
 
@@ -142,7 +142,7 @@ Confirms `gpio_out_wire` is declared, connected to the IP's `.gpio_out()` port, 
 
 ---
 
-**Figure 3 — Context around the GPIO instantiation (`grep -n "gpio_ip" -A 15 riscv.v`)**
+**Context around the GPIO instantiation (`grep -n "gpio_ip" -A 15 riscv.v`)**
 
 ![gpio_ip context](screenshots/ss15.png)
 
@@ -150,7 +150,7 @@ A wider grep showing the `` `include "gpio_ip.v" `` at the top of the file along
 
 ---
 
-**Figure 4 — `IO_rdata` mux logic (`grep -n "IO_rdata" -A 6 riscv.v`)**
+**`IO_rdata` mux logic (`grep -n "IO_rdata" -A 6 riscv.v`)**
 
 ![IO_rdata mux](screenshots/ss16.png)
 
@@ -158,7 +158,7 @@ Shows how `IO_rdata` is built: it selects `gpio_rdata_wire` when the GPIO bit is
 
 ---
 
-**Figure 5 — All usages of `IO_GPIO_bit` (`grep -n "IO_GPIO_bit" riscv.v`)**
+**All usages of `IO_GPIO_bit` (`grep -n "IO_GPIO_bit" riscv.v`)**
 
 ![IO_GPIO_bit usages](screenshots/ss17.png)
 
@@ -166,7 +166,7 @@ Cross-checks every place the new bit constant is used: its `localparam` definiti
 
 ---
 
-**Figure 6 — Bus signal cross-check (`mem_addr`, `mem_wdata`, `mem_rdata`)**
+**Bus signal cross-check (`mem_addr`, `mem_wdata`, `mem_rdata`)**
 
 ![Bus signal usage](screenshots/ss18.png)
 
@@ -174,7 +174,7 @@ A broad grep across `mem_addr`, `mem_wdata`, and `mem_rdata` confirms the GPIO I
 
 ---
 
-**Figure 7 — Quick sanity check (`grep -n "gpio_ip" riscv.v`)**
+**Quick sanity check (`grep -n "gpio_ip" riscv.v`)**
 
 ![gpio_ip sanity check](screenshots/ss19.png)
 
@@ -182,7 +182,7 @@ A final, minimal grep confirming just the two essential lines: the `` `include "
 
 ---
 
-**Figure 8 — Full file view in `nano`: existing peripherals + GPIO Address Decode**
+**Full file view in `nano`: existing peripherals + GPIO Address Decode**
 
 ![nano view part 1](screenshots/ss20.png)
 
@@ -190,7 +190,7 @@ Scrolling through `riscv.v` in `nano` to see the GPIO integration in context wit
 
 ---
 
-**Figure 9 — Full file view in `nano`: GPIO instantiation, output exposure, and clock**
+**Full file view in `nano`: GPIO instantiation, output exposure, and clock**
 
 ![nano view part 2](screenshots/ss21.png)
 
