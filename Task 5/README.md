@@ -49,7 +49,7 @@ point before any modifications.
 
 ###  Reading the Full GPIO IP
 
-![ss2](ss_2_cat_gpio.png)
+![ss2](screenshots/ss_2_cat_gpio.png)
 
 Full content of existing `gpio_ip.v` read using `cat`. The module
 has five ports: `clk`, `mem_wdata [31:0]`, `mem_wstrb`, `gpio_sel`,
@@ -61,7 +61,7 @@ register.
 
 ###  GPIO IP Tail — LED Drive Logic
 
-![ss2b](ss_2b.png)
+![ss2b](screenshots/ss_2b.png)
 
 Tail of `gpio_ip.v` showing the LED drive block —
 `gpio_out <= mem_wdata[4:0]` fires directly on every write. In
@@ -70,7 +70,7 @@ the register split. `endmodule` confirms end of file.
 
 ### Identifying the Existing Register
 
-![ss3](ss3_existing_reg.png)
+![ss3](screenshots/ss3_existing_reg.png)
 
 The register storage section showing `reg [31:0] gpio_reg` — the
 single storage element in Task-4. In Task-5 this will be replaced
@@ -79,7 +79,7 @@ by three separate registers: `gpio_data`, `gpio_dir`, and
 
 ###  Identifying mem_wstrb Usage
 
-![ss4](ss_4_mem_wstrb.png)
+![ss4](screenshots/ss_4_mem_wstrb.png)
 
 `grep -n "mem_wstrb" gpio_ip.v` shows `mem_wstrb` at line 10
 (port declaration), line 29 (write logic condition), and line 50
@@ -88,7 +88,7 @@ be preserved inside the updated `case(gpio_addr)` write block.
 
 ###  Checking gpio_rdata
 
-![ss5](ss5_gpio_rdata.png)
+![ss5](screenshots/ss5_gpio_rdata.png)
 
 `grep -n "gpio_rdata" gpio_ip.v` confirms `gpio_rdata` declared
 as `output reg [31:0]` at line 12, assigned from `gpio_reg` at
@@ -98,7 +98,7 @@ which offset the CPU is reading.
 
 ###  Checking Inputs
 
-![ss6](ss6_inputs.png)
+![ss6](screenshots/ss6_inputs.png)
 
 `grep -n "input" gpio_ip.v` shows current inputs: `clk` (line 8),
 `mem_wdata [31:0]` (line 9), `mem_wstrb` (line 10), `gpio_sel`
@@ -108,7 +108,7 @@ across the three registers.
 
 ###  Checking Outputs
 
-![ss7](ss7_output.png)
+![ss7](screenshots/ss7_output.png)
 
 `grep -n "output" gpio_ip.v` confirms outputs: `gpio_rdata [31:0]`
 (line 12) and `gpio_out [4:0]` (line 13). Both outputs remain
@@ -116,7 +116,7 @@ unchanged in Task-5 — only their internal driving logic is updated.
 
 ###  Checking gpio_sel in riscv.v
 
-![ss8](ss8_address_decoding.png)
+![ss8](screenshots/ss8_address_decoding.png)
 
 `grep -n "gpio_sel" riscv.v` shows `gpio_sel = isIO & mem_wordaddr[IO_GPIO_bit]`
 at line 387 and `.gpio_sel(gpio_sel)` at line 395. The peripheral
@@ -126,7 +126,7 @@ needed here.
 
 ###  Identifying Where to Add Registers
 
-![ss9](ss_9_additional_reg_added_here.png)
+![ss9](screenshots/ss_9_additional_reg_added_here.png)
 
 The register storage section of the existing file — this is
 exactly where `gpio_data`, `gpio_dir`, and `gpio_readback` will
@@ -135,7 +135,7 @@ with no combinational assignments keep latch behavior out.
 
 ###  Identifying Where to Add Offset Decoding
 
-![ss10](ss_10_add_offset_decoding_here.png)
+![ss10](screenshots/ss_10_add_offset_decoding_here.png)
 
 The address decoding insertion point — `wire [1:0] gpio_addr = mem_addr[3:2]`
 will be placed here right after the port list. Both the write
@@ -144,7 +144,7 @@ to route accesses to the correct register.
 
 ###  Planned Internal Signals
 
-![ss10_last](ss10_last_part_of_step1.png)
+![ss10_last](screenshots/ss10_last_part_of_step1.png)
 
 Planning table summarizing the three internal signals:
 
@@ -167,7 +167,7 @@ The key principle: `GPIO_READ` is read-only, `GPIO_DATA` and
 
 ###  Before — Task-2 Port List
 
-![ss11](ss11_step_2__original.png)
+![ss11](screenshots/ss11_step_2_original.png)
 
 The original Task-2 port list kept as reference. Five ports total:
 `clk`, `mem_wdata [31:0]`, `mem_wstrb`, `gpio_sel`, `gpio_rdata [31:0]`,
@@ -176,7 +176,7 @@ any Task-3 modifications begin.
 
 ###  Updated gpio_ip.v — Ports, Wire, and Registers
 
-![ss12](ss12_mulitple_reg_and_add_decoding.png)
+![ss12](screenshots/ss12_mulitple_reg_and_add_decoding.png)
 
 The fully updated `gpio_ip.v` showing all structural changes:
 - `input [31:0] mem_addr` added as new port for address decoding
@@ -191,7 +191,7 @@ The fully updated `gpio_ip.v` showing all structural changes:
 
 ###  Write Logic — case(gpio_addr)
 
-![ss13](ss13_add_decoding_implemented.png)
+![ss13](screenshots/ss13_add_decoding_implemented.png)
 
 The write always block triggered on `posedge clk` when
 `gpio_sel && mem_wstrb`:
@@ -204,7 +204,7 @@ The write always block triggered on `posedge clk` when
 
 ###  Readback Logic — Part 1
 
-![ss13b](ss13b.png)
+![ss13b](screenshots/ss13b.png)
 
 The read always block triggered on `posedge clk` when `gpio_sel`:
 - `2'b00` → `gpio_rdata <= gpio_data` — returns last written value
@@ -215,12 +215,12 @@ The read always block triggered on `posedge clk` when `gpio_sel`:
   offsets
 
 ###  GPIO Output Drive Logic — LED Mapping
-![ss13c](ss13c.png)
+![ss13c](screenshots/ss13c.png)
 This block drives the GPIO output pins that connect to the LEDs. The lower 5 bits of `gpio_data` are mapped to the 5 onboard LEDs. On every `posedge clk`, `gpio_out` is updated synchronously with `gpio_data[4:0]`, ensuring clean, glitch-free output without any latch behavior. This corresponds to the `GPIO_DATA` register's output-driving function from the Task-3 register map (offset `0x00`), where writes to `GPIO_DATA` are reflected on the physical output pins.
 
 ###  riscv.v Instantiation Update
 
-![ss14](ss14_instantiation_edited.png)
+![ss14](screenshots/ss14_instantiation_edited.png)
 
 The updated GPIO instantiation in `riscv.v`:
 - `.clk(clk)` — system clock
@@ -241,7 +241,7 @@ new three-register design.
 
 ###  GPIO IP Included and Instantiated
 
-![ss15](ss15__step3_gpio_instantiated_in_riscv.png)
+![ss15](screenshots/ss15__step3_gpio_instantiated_in_riscv.png)
 
 `grep -n "gpio_ip" riscv.v` confirms two things:
 - Line 9: `` `include "gpio_ip.v" `` — the GPIO IP file is
@@ -251,7 +251,7 @@ new three-register design.
 
 ###  Full Instantiation and Signal Routing
 
-![ss16](ss16_routing_check.png)
+![ss16](screenshots/ss16_routing_check.png)
 
 Full context around the GPIO instantiation showing the complete
 signal routing inside `riscv.v`:
@@ -273,7 +273,7 @@ signal routing inside `riscv.v`:
 
 ###  mem_addr Routing Confirmed
 
-![ss17](ss17_address_bits_check.png)
+![ss17](screenshots/ss17_address_bits_check.png)
 
 `grep -n "mem_addr" riscv.v` traces the full path of `mem_addr`
 through the SoC:
@@ -293,7 +293,7 @@ through the SoC:
 
 ###  Top-Level GPIO_OUT Exposure
 
-![ss18](ss18_top_level_exposure.png)
+![ss18](screenshots/ss18_top_level_exposure.png)
 
 `grep -n "GPIO_OUT" riscv.v` confirms the full output chain:
 - Line 402: `wire [4:0] GPIO_OUT` declared as top-level wire
@@ -315,7 +315,7 @@ Validation was done in two parts:
 
 ###  Firmware C File Created
 
-![ss19_c](ss19_gpio_multi_test_c.png)
+![ss19_c](screenshots/ss19_gpio_multi_test_c.png)
 
 `gpio_multi_test.c` created in `Firmware/` by copying from
 `gpio_test.c` as a starting point. The file is then opened in
@@ -324,7 +324,7 @@ Validation was done in two parts:
 
 ###  Updated Verilog Testbench
 
-![ss19_tb](ss19_gpio_testbench.png)
+![ss19_tb](screenshots/ss19_gpio_testbench.png)
 
 Updated `gpio_testbench.v` shown after modifications for Task-3.
 Key changes from Task-2 testbench:
@@ -339,7 +339,7 @@ Key changes from Task-2 testbench:
 
 ###  Test Sequence — Part 1
 
-![ss20_a](ss20_a.png)
+![ss20_a](screenshots/ss20_a.png)
 
 First half of the test sequence showing Tests 1–3:
 - `mem_addr = 32'h400020` set before each GPIO_DATA write
@@ -352,7 +352,7 @@ First half of the test sequence showing Tests 1–3:
 
 ###  Test Sequence — Part 2
 
-![ss20_cat](ss20_cat_gpio_test_new.png)
+![ss20_cat](screenshots/ss20_cat_gpio_test_new.png)
 
 Second half of the test sequence showing Tests 4–6:
 - Test4: writes `0x00000015` → pattern `10101` on LEDs
@@ -365,7 +365,7 @@ Second half of the test sequence showing Tests 4–6:
 
 ###  Compile and Run Simulation
 
-![ss21](ss21.png)
+![ss21](screenshots/ss21.png)
 
 Simulation compiled and run:
 - `iverilog -o gpio_simulation gpio_ip.v gpio_testbench.v` —
@@ -380,7 +380,7 @@ Simulation compiled and run:
 
 ###  Simulation Output — Register Verification
 
-![ss22](ss22.png)
+![ss22](screenshots/ss22.png)
 
 Full simulation output verifying all register behavior:
 
@@ -400,7 +400,7 @@ Test6 confirms peripheral select gating works — no change when
 
 ###  GTKWave Waveform
 
-![ss23](ss23.png)
+![ss23](screenshots/ss23.png)
 
 GTKWave waveform opened from `gpio_ip_tb.vcd` showing all signals
 across the full 126ns simulation:
@@ -416,7 +416,7 @@ across the full 126ns simulation:
 
 ###  GTKWave Launch Command
 
-![ss24](ss24.png)
+![ss24](screenshots/ss24.png)
 
 `gtkwave gpio_ip_tb.vcd` launch output confirming:
 - GTKWave Analyzer v3.3.116 loaded successfully
@@ -427,7 +427,7 @@ across the full 126ns simulation:
 
 ###  C Software Validation — Program
 
-![ss25](ss25.png)
+![ss25](screenshots/ss25.png)
 
 `test.c` written in `Firmware/` as a standalone C-level software
 validation:
@@ -441,7 +441,7 @@ validation:
 
 ###  C Software Validation — Compile and Run
 
-![ss26](ss26.png)
+![ss26](screenshots/ss26.png)
 
 `test.c` compiled with `gcc test.c -o test` and executed with
 `./test`. Output confirms:
