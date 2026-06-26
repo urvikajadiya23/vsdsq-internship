@@ -40,7 +40,7 @@ exactly where changes need to be made.
 
 ###  RTL Directory Listing
 
-![ss1](ss1.png)
+![ss1](screenshots/ss1.png)
 
 Directory listing of `RTL/` confirming all relevant files present:
 `gpio_ip.v`, `riscv.v`, `gpio_testbench.v`, `Makefile`,
