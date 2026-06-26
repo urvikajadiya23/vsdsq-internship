@@ -19,5 +19,7 @@ This repository serves as the official documentation of tasks completed during t
 | [Task 2](./Task2/) | Traffic Light Controller — GCC & RISC-V compilation and  Spike Debugger | 
 | [Task 3](./Task3/)|Environment Setup & RISC-V Reference Bring-Up |
 | [Task 4](./Task4/)|Design & Integrate Your First Memory-Mapped IP|
+| [Task 5](./Task5/)|Design a Multi-Register GPIO IP with Software Control|
+
 ---
 
