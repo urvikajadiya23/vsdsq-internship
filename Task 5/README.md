@@ -315,7 +315,7 @@ Validation was done in two parts:
 
 ###  Firmware C File Created
 
-![ss19_c](screenshots/ss19_gpio_multi_test_c.png)
+![ss19_c](screenshots/ss19_gpio_multi_test.c.png)
 
 `gpio_multi_test.c` created in `Firmware/` by copying from
 `gpio_test.c` as a starting point. The file is then opened in
@@ -339,7 +339,7 @@ Key changes from Task-2 testbench:
 
 ###  Test Sequence — Part 1
 
-![ss20_a](screenshots/ss20_a.png)
+![ss20_a](screenshots/ss20_cat_gpio_test_new.png)
 
 First half of the test sequence showing Tests 1–3:
 - `mem_addr = 32'h400020` set before each GPIO_DATA write
@@ -352,7 +352,7 @@ First half of the test sequence showing Tests 1–3:
 
 ###  Test Sequence — Part 2
 
-![ss20_cat](screenshots/ss20_cat_gpio_test_new.png)
+![ss20_cat](screenshots/ss20_a.png)
 
 Second half of the test sequence showing Tests 4–6:
 - Test4: writes `0x00000015` → pattern `10101` on LEDs
