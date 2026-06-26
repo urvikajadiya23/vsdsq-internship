@@ -241,7 +241,7 @@ new three-register design.
 
 ###  GPIO IP Included and Instantiated
 
-![ss15](screenshots/ss15__step3_gpio_instantiated_in_riscv.png)
+![ss15](screenshots/ss15_step3_gpio_instantiated_in_riscv.png)
 
 `grep -n "gpio_ip" riscv.v` confirms two things:
 - Line 9: `` `include "gpio_ip.v" `` — the GPIO IP file is
