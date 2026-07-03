@@ -401,19 +401,6 @@ Info: Program finished normally.
 ##  Flashing the Bitstream
 
 ```bash
-make flash
-```
-
-**First attempt failed** with a USB permissions error:
-
-```
-Can't find iCE FTDI USB device (vendor_id 0x0403, device_id 0x6010 or 0x6014).
-ABORT.
-```
-
-**Fix:** re-ran with `sudo`:
-
-```bash
 sudo make flash
 ```
 
@@ -464,7 +451,10 @@ Every flash cycle reports a clean `VERIFY OK`, and `cdone: high` confirms the FP
 ---
 
 ## Brief description of the task
-
+The SPI Master IP is a minimal, single-byte Mode 0 (CPOL=0, CPHA=0) SPI controller integrated into the basicRISCV SoC as a memory-mapped peripheral at base address 0x400030. Software controls it through four 32-bit registers — CTRL for enabling the block, starting a transfer, and setting the clock divider; TXDATA for loading the byte to send; RXDATA for reading the byte received; and STATUS for polling busy/done state.
+Internally, the IP is built around a simple FSM that drives CS_N low at the start of a transfer, toggles SCLK at a rate set by the clock divider, and shifts one bit out on MOSI while sampling one bit in on MISO per clock edge — 8 bits per transfer, matching standard SPI Mode 0 timing (sample on rising edge, shift on falling edge). Once all 8 bits are exchanged, CS_N returns high, the received byte is latched into RXDATA, and the DONE flag is set for firmware to poll.
+The design was validated in three stages: a standalone Icarus Verilog testbench exercising the IP directly with a loopback (MISO = MOSI), confirming a transmitted 0xA5 is correctly received back; a full-SoC Verilator simulation running the actual C firmware (spi_test.c) through the CPU, memory bus, and address decoder end-to-end; and synthesis/place-and-route through the full iCE40 toolchain (yosys → nextpnr-ice40 → icetime → icepack), successfully meeting timing at 12 MHz .
+This confirms the SPI Master's register interface, bus integration, and core shift/sample logic all function correctly.
 
 ---
 
