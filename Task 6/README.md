@@ -275,14 +275,8 @@ integration path: CPU → bus → address decode → `SPI_MASTER` → loopback
 
 ## Step 8: Hardware Validation
 
-*(To be added.)*
+
 
 ---
 
-## Design Notes
 
-- Undefined register offsets return `32'd0` on read and ignore writes,
-  per the common integration rules.
-- `RXDATA` has no write path — it is strictly read-only, matching spec.
-- `START` self-clears in hardware, so firmware only needs to set it once
-  per transfer.
