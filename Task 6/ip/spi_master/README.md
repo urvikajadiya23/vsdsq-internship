@@ -1,4 +1,4 @@
-# Task-4: SPI Master IP (Minimal, Single-Byte, Mode 0)
+# Task-4: Real Peripheral IP Development - SPI Master IP (Minimal, Single-Byte, Mode 0)
 
 ## Overview
 
@@ -120,14 +120,6 @@ Added `IO_SPI_bit = 4` to the existing 1-hot IO address decode scheme
 alongside UART and GPIO:
 
 ![IO_rdata mux](screenshots/ss9_spi_to_cpu.png)
-
-### Top-level SOC port list (pre-hardware-validation state)
-
-At this stage, the `SOC` module only exposed `CLK`, `RESET`, `LEDS`,
-`RXD`, `TXD` — SPI pins were internal to the SoC only, sufficient for
-simulation:
-
-![SOC port list](screenshots/ss10_clk.png)
 
 ### Clockworks
 
@@ -274,6 +266,204 @@ integration path: CPU → bus → address decode → `SPI_MASTER` → loopback
 ---
 
 ## Step 8: Hardware Validation
+
+End-to-end flow for getting the SPI Master IP onto the VSDSquadron FM board: SOC port wiring → pin constraints → loopback → simulation check → build → flash → UART validation.
+
+---
+
+##  Adding SPI Ports to the SOC Module
+
+The top-level `SOC` module port list was extended with the three SPI hardware pins, alongside the existing UART and LED ports:
+
+```verilog
+module SOC (
+`ifdef BENCH
+  input             CLK,      // system clock
+`endif
+  input             RESET,    // reset button
+  output reg [4:0]  LEDS,     // system LEDs
+  input             RXD,      // UART receive
+  output            TXD,      // UART transmit
+  output            spi_sclk_pin,  // SPI clock (hardware pin)
+  output            spi_mosi_pin,  // SPI MOSI
+  output            spi_cs_n_pin   // SPI chip-select (hardware pin)
+);
+```
+
+Note `spi_miso_pin` isn't in this list — MISO is handled internally via loopback rather than as an external pin (see Step 3).
+
+![SOC module port list with SPI pins added](screenshots/s23_modify_SOC.png)
+
+---
+
+##  Adding SPI Pins to the PCF
+
+The corresponding physical pin numbers were appended to `VSDSquadronFM.pcf`:
+
+```bash
+cat >> VSDSquadronFM.pcf << 'EOF'
+set_io  spi_sclk_pin 9
+set_io  spi_mosi_pin 10
+set_io  spi_cs_n_pin 12
+EOF
+```
+
+**Fixing a stray edit:** the append left `RXD 3` and `set_io spi_sclk_pin 9` glued onto one line (missing newline before the heredoc). Fixed with:
+
+```bash
+sed -i 's/RXD 3set_io/RXD 3\nset_io/' VSDSquadronFM.pcf
+```
+
+Final `VSDSquadronFM.pcf` correctly lists `RXD 3` on its own line, followed by the three SPI pin assignments each on their own line.
+
+![PCF pin constraint edit](screenshots/ss22_modifying_pcf.png)
+
+---
+
+## Internal MISO Loopback (Top-Level Wiring)
+
+No external jumper wire is available on this setup, so `spi_miso` is tied directly to `spi_mosi` **inside the FPGA fabric**, alongside the normal pin assignments:
+
+```verilog
+assign spi_sclk_pin  = spi_sclk;
+assign spi_mosi_pin  = spi_mosi;
+assign spi_cs_n_pin  = spi_cs_n;
+
+// Internal loopback (no physical jumper wire available):
+// MISO is tied to MOSI inside the FPGA fabric itself, so the
+// hardware test exercises the real SPI_MASTER FSM/shift logic
+// on silicon, without requiring an external MOSI->MISO jumper.
+assign spi_miso = spi_mosi;
+```
+
+This still exercises the real SPI Master FSM and shift-register logic on real hardware — it just avoids relying on a physical wire for the loopback path.
+
+![Internal loopback wiring](screenshots/ss23_modification.png)
+
+---
+
+##  Simulation Sanity Check (Pre-Hardware)
+
+Before flashing, `make sim` was re-run to confirm the RTL was still functionally correct after the port/pin/wiring changes:
+
+```bash
+make sim
+```
+
+Output confirmed the loopback test passes at the simulation level:
+
+```
+Simulation started...
+SPI TEST START
+RX = 0x000000A5
+SPI TEST DONE. Simulation complete.
+```
+
+`RX = 0xA5` matches the byte written to `TXDATA`, confirming the shift logic and loopback path are correct before moving to the board.
+
+![Simulation still passing after wiring changes](screenshots/ss24_sim_intact.png)
+
+---
+
+##  Adding the IP to the Build (Makefile)
+
+`spi_master.v` was added alongside `riscv.v` in the Makefile's `VERILOG_FILE` list so every downstream target (`build`, `sim`) compiles them together:
+
+```makefile
+VERILOG_FILE= riscv.v spi_master.v
+```
+
+![Makefile edit](screenshots/ss25_adding_to_makefile.png)
+
+---
+
+##  Synthesis, Place & Route, and Timing Analysis
+
+```bash
+make build
+```
+
+This runs Yosys synthesis → nextpnr-ice40 place & route → icetime static timing analysis → icepack bitstream packing.
+
+**Result:** timing closed comfortably — max clock frequency came out to **17.24 MHz**, well above the 12 MHz constraint (PASS). One harmless warning was reported for the HFOSC cell (expected — it's not a timing-analyzable path).
+
+```
+Info: Max frequency for clock 'clk': 17.24 MHz (PASS at 12.00 MHz)
+...
+1 warning, 0 errors
+Info: Program finished normally.
+```
+
+![make build output — timing PASS at 17.24 MHz](screenshots/ss26_make_build.png)
+
+---
+
+##  Flashing the Bitstream
+
+```bash
+make flash
+```
+
+**First attempt failed** with a USB permissions error:
+
+```
+Can't find iCE FTDI USB device (vendor_id 0x0403, device_id 0x6010 or 0x6014).
+ABORT.
+```
+
+**Fix:** re-ran with `sudo`:
+
+```bash
+sudo make flash
+```
+
+This succeeded cleanly:
+
+```
+flash ID: 0xEF 0x40 0x16 0x00
+programming..
+done.
+reading..
+VERIFY OK
+cdone: high
+Bye.
+```
+
+`cdone: high` at both start and end confirms the FPGA configured successfully from the newly written bitstream.
+
+![sudo make flash — VERIFY OK](screenshots/ss27_make_flash.png)
+
+---
+
+##  UART Terminal Validation (Unresolved)
+
+```bash
+sudo make terminal
+```
+
+`picocom` connected cleanly to `/dev/ttyUSB0` at 9600 baud and reported "Terminal ready" — but **no UART output ever appeared**, even after the SPI test firmware should have printed its TX/RX comparison.
+
+![picocom connected, port open, no output](screenshots/ss28.png)
+
+### Debugging steps already tried
+
+| Fix attempted | Result |
+|---|---|
+| RESET line pull-up | No change |
+| DTR / `--noreset` picocom flag | No change |
+| USB reattachment (detach/reattach in VirtualBox) | Device re-enumerates correctly, still silent |
+| Clean re-flash before each terminal attempt | Flash is consistently `VERIFY OK` |
+| Re-checking baud rate / device path | Confirmed correct (`9600`, `/dev/ttyUSB0`) |
+
+Every flash cycle reports a clean `VERIFY OK`, and `cdone: high` confirms the FPGA is configured — so the SPI Master IP and bitstream aren't obviously at fault. The failure is isolated specifically to the UART data path.
+
+**Current assessment:** likely a board-level or VM-passthrough issue rather than an RTL/software one — a cold solder joint, a genuine board defect on the UART/USB data path, or a VirtualBox USB serial quirk. Ruling this out needs the physical board on bare-metal hardware (or a different host/OS), ideally with a multimeter/scope on the TX pin to confirm whether the FPGA is driving it at all.
+
+![VSDSquadron FM board — powered, PWR LED on](screenshots/ss29_board.jpeg)
+
+---
+
+## Brief description of the task
 
 
 ---
