@@ -432,19 +432,28 @@ sudo make terminal
 
 ![picocom connected, port open, no output](screenshots/ss28.png)
 
+## Port Occupancy Check and checking dmesg log
+![](screenshots/ss29.png)
+
+Ran a full sweep of serial port state before re-attempting make terminal:
+ls -l /dev/ttyUSB* /dev/ttyACM* /dev/ttyS* — confirmed /dev/ttyUSB0 was present (device 188,0) alongside the standard set of unused legacy ttyS0–31 nodes.
+sudo lsof /dev/ttyUSB0 /dev/ttyUSB1 /dev/ttyACM0 and sudo lsof | grep -E 'ttyUSB|ttyACM|ttyS' — both returned no output, confirming no process (stale picocom/minicom session or otherwise) was holding any serial port open.
+ls /dev/ttyUSB* /dev/ttyACM* | wc -l — confirmed exactly one active USB-serial node.
+
+![](screenshots/ss30.png)
+Port occupancy is ruled out as the cause of the make terminal failure — the port was free and available at the time of testing. The dmesg log instead shows the FT232H repeatedly attaching and then disconnecting on its own (FTDI USB Serial Device converter now disconnected from ttyUSB0) within seconds of enumeration, with no competing process involved. This points to the USB link itself dropping (most likely VirtualBox USB passthrough instability) rather than a port-conflict issue.
+
 ### Debugging steps already tried
+Before concluding this was a hardware/VM-level issue, I worked through the usual suspects one by one:
 
-| Fix attempted | Result |
-|---|---|
-| RESET line pull-up | No change |
-| DTR / `--noreset` picocom flag | No change |
-| USB reattachment (detach/reattach in VirtualBox) | Device re-enumerates correctly, still silent |
-| Clean re-flash before each terminal attempt | Flash is consistently `VERIFY OK` |
-| Re-checking baud rate / device path | Confirmed correct (`9600`, `/dev/ttyUSB0`) |
+RESET line pull-up — added it, no change in behavior.
+DTR / --noreset flag in picocom — tried disabling DTR-triggered reset, still no output.
+USB reattachment — detached and reattached the FTDI device in VirtualBox; it re-enumerates cleanly each time, but the terminal stays silent.
+Clean re-flash before every terminal attempt — every single flash reports a clean VERIFY OK, so the bitstream is landing on the FPGA correctly.
+Double-checked baud rate and device path — both confirmed correct (9600 baud, /dev/ttyUSB0).
 
-Every flash cycle reports a clean `VERIFY OK`, and `cdone: high` confirms the FPGA is configured — so the SPI Master IP and bitstream aren't obviously at fault. The failure is isolated specifically to the UART data path.
-
-**Current assessment:** likely a board-level or VM-passthrough issue rather than an RTL/software one — a cold solder joint, a genuine board defect on the UART/USB data path, or a VirtualBox USB serial quirk. Ruling this out needs the physical board on bare-metal hardware (or a different host/OS), ideally with a multimeter/scope on the TX pin to confirm whether the FPGA is driving it at all.
+None of these moved the needle. What's notable is that every flash cycle completes with VERIFY OK, and cdone reads high, which means the FPGA is genuinely configured and running the bitstream — so the SPI Master IP itself and the synthesis/flash pipeline don't appear to be the problem. The failure seems narrowly isolated to the UART data path specifically.
+Where things stand: at this point, it looks less like an RTL or software bug and more like something at the board or VM-passthrough level — could be a cold solder joint, an actual defect on the board's UART/USB line, or a VirtualBox USB-serial quirk that's silently swallowing the data. Confirming which one it is would need testing on bare-metal hardware (or a different host OS), and ideally probing the FPGA's TX pin with a multimeter or scope to see whether it's actually toggling at all.
 
 ![VSDSquadron FM board — powered, PWR LED on](screenshots/ss29_board.jpeg)
 
