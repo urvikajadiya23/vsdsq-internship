@@ -1,4 +1,4 @@
-# Task-4: Real Peripheral IP Development - SPI Master IP (Minimal, Single-Byte, Mode 0)
+# Task-6: Real Peripheral IP Development - SPI Master IP (Minimal, Single-Byte, Mode 0)
 
 ## Overview
 
