@@ -98,8 +98,6 @@ ip/
     │   └── spi_master.v
     ├── software/
     │   └── spi_test.c
-    ├── test/
-    │   └── spi_master_tb.v
     ├── docs/
     │   ├── IP_User_Guide.md
     │   ├── Register_Map.md
