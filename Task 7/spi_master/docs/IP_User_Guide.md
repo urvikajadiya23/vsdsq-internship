@@ -25,7 +25,6 @@ The SPI Master supports one transfer at a time and automatically manages the SPI
 - Automatic chip-select (CS_N) control
 - Hardware-generated BUSY and DONE status flags
 - Software-controlled transfer initiation
-- Internal loopback support for validation on VSDSquadron FPGA
 - Simple integration into the VSDSquadron RISC-V SoC
 
 ---
@@ -157,7 +156,11 @@ The SPI Master IP has been validated using:
 
 - RTL simulation
 - Memory-mapped software execution on the RISC-V processor
-- Internal MOSI-to-MISO loopback on the VSDSquadron FPGA
+The SPI Master IP has been validated using:
+
+• RTL simulation with a MOSI-to-MISO loopback connection in the testbench.
+
+• Hardware implementation on the VSDSquadron FPGA using the integrated SPI data path within the SoC.
 
 The loopback configuration allows transmitted data to be received back without requiring an external SPI slave device.
 
