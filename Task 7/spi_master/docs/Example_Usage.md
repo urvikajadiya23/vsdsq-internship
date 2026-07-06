@@ -141,15 +141,16 @@ During FPGA implementation, the SPI receive path is validated through the intern
 
 The example application (`spi_test.c`) was successfully compiled and converted into a BRAM image.
 
-![Firmware Build](screenshots/firmware_build.png)
+![Firmware Build](screenshots/ss14_spi_test_c.png)
+![](screenshots/ss14_b.png)
 
 ---
 
 ### RTL Simulation
 
 Simulation completed successfully, with the transmitted byte (`0xA5`) correctly received through the loopback path.
-
-![Simulation Output](screenshots/simulation_output.png)
+![](screenshots/ss16_hex.png)
+![Simulation Output](screenshots/ss17_make_sim.png)
 
 ---
 
@@ -157,15 +158,7 @@ Simulation completed successfully, with the transmitted byte (`0xA5`) correctly 
 
 The waveform confirms correct SPI timing, data shifting, and successful reception of `0xA5`.
 
-![GTKWave](screenshots/gtkwave.png)
-
----
-
-### FPGA Implementation
-
-The complete SoC, including the SPI Master IP, was successfully synthesized, placed, and routed.
-
-![Implementation](screenshots/implementation.png)
+![GTKWave](screenshots/ss20_gtkwave.png)
 
 ---
 
@@ -173,7 +166,8 @@ The complete SoC, including the SPI Master IP, was successfully synthesized, pla
 
 The generated bitstream was successfully programmed onto the VSDSquadron FPGA.
 
-![Hardware Flash](images/hardware_flash.png)
+![](screenshots/ss27_make_flash.png)
+
 ---
 
 # 8. Notes
