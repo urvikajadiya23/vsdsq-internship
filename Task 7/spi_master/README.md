@@ -1,4 +1,4 @@
-# Commercial-Grade SPI Master IP
+# TASK 7 : Commercial-Grade SPI Master IP
 
 A lightweight, memory-mapped **SPI Master IP** for the **VSDSquadron RISC-V SoC**. The IP implements **SPI Mode 0 (CPOL = 0, CPHA = 0)** and supports **single-byte (8-bit) full-duplex SPI communication** with a programmable serial clock.
 
