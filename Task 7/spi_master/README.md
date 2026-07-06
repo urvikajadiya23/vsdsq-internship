@@ -105,6 +105,14 @@ ip/
     │   ├── Register_Map.md
     │   ├── Integration_Guide.md
     │   └── Example_Usage.md
+    ├── screenshots/
+    │   ├── spi_test_c.png
+    │   ├── make_spi_test.png
+    │   ├── firmware_words.png
+    │   ├── make_sim.png
+    │   ├── gtkwave.png
+    │   ├── make_build.png
+    │   └── make_flash.png
     └── README.md
 ```
 ## Terminal Verification
