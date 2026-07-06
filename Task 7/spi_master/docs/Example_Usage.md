@@ -137,6 +137,43 @@ During RTL simulation, the SPI receive path is verified using a testbench loopba
 
 During FPGA implementation, the SPI receive path is validated through the internal loopback connection integrated within the SoC design.
 
+### Firmware Compilation
+
+The example application (`spi_test.c`) was successfully compiled and converted into a BRAM image.
+
+![Firmware Build](screenshots/firmware_build.png)
+
+---
+
+### RTL Simulation
+
+Simulation completed successfully, with the transmitted byte (`0xA5`) correctly received through the loopback path.
+
+![Simulation Output](screenshots/simulation_output.png)
+
+---
+
+### Waveform Verification
+
+The waveform confirms correct SPI timing, data shifting, and successful reception of `0xA5`.
+
+![GTKWave](screenshots/gtkwave.png)
+
+---
+
+### FPGA Implementation
+
+The complete SoC, including the SPI Master IP, was successfully synthesized, placed, and routed.
+
+![Implementation](screenshots/implementation.png)
+
+---
+
+### Hardware Programming
+
+The generated bitstream was successfully programmed onto the VSDSquadron FPGA.
+
+![Hardware Flash](images/hardware_flash.png)
 ---
 
 # 8. Notes
