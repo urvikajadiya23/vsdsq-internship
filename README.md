@@ -21,5 +21,6 @@ This repository serves as the official documentation of tasks completed during t
 | [Task 4](./Task4/)|Design & Integrate Your First Memory-Mapped IP|
 | [Task 5](./Task5/)|Design a Multi-Register GPIO IP with Software Control|
 | [Task 6](./Task6/) |Real Peripheral IP Development - SPI Master IP (Minimal, Single-Byte, Mode 0)|
+| [Task 7](./Task7/)|Commercial-Grade SPI MASTER IP Documentation| 
 ---
 
