@@ -105,18 +105,19 @@ ip/
     │   ├── Register_Map.md
     │   ├── Integration_Guide.md
     │   └── Example_Usage.md
-    ├── screenshots/
-    │   ├── spi_test_c.png
-    │   ├── make_spi_test.png
-    │   ├── firmware_words.png
-    │   ├── make_sim.png
-    │   ├── gtkwave.png
-    │   ├── make_build.png
-    │   └── make_flash.png
+    └── screenshots/
+    |   ├── placeholder.md
+    |   ├── ss14_b.png
+    |   ├── ss14_spi_test_c.png
+    |   ├── ss16_hex.png
+    |   ├── ss17_make_sim.png
+    |   ├── ss20_gtkwave.png
+    |   ├── ss27_make_flash.png
+    |   └── task7_tree.png
     └── README.md
 ```
 ## Terminal Verification
-[](screenshots/task7_tree.png)
+![](screenshots/task7_tree.png)
 
 ---
 
