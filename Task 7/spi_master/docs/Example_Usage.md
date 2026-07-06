@@ -141,7 +141,8 @@ During FPGA implementation, the SPI receive path is validated through the intern
 
 The example application was compiled successfully to generate the firmware image.
 
-![Firmware Compilation](screenshots/ss14_spi_test_c.png)
+![Firmware Compilation](../screenshots/ss14_spi_test_c.png)
+![Firmware Compilation](../screenshots/ss14_b.png)
 
 ---
 
@@ -149,7 +150,7 @@ The example application was compiled successfully to generate the firmware image
 
 The compiled ELF file was successfully converted into a HEX file for SoC memory initialization.
 
-![HEX Generation](screenshots/ss16_hex.png)
+![HEX Generation](../screenshots/ss16_hex.png)
 
 ---
 
@@ -157,7 +158,7 @@ The compiled ELF file was successfully converted into a HEX file for SoC memory 
 
 RTL simulation completed successfully, and the transmitted byte (`0xA5`) was correctly received through the SPI loopback path.
 
-![Simulation Output](screenshots/ss17_make_sim.png)
+![Simulation Output](../screenshots/ss17_make_sim.png)
 
 ---
 
@@ -165,7 +166,7 @@ RTL simulation completed successfully, and the transmitted byte (`0xA5`) was cor
 
 GTKWave confirms correct SPI timing, data shifting, and successful reception of the transmitted byte.
 
-![GTKWave](screenshots/ss20_gtkwave.png)
+![GTKWave](../screenshots/ss20_gtkwave.png)
 
 ---
 
@@ -173,7 +174,7 @@ GTKWave confirms correct SPI timing, data shifting, and successful reception of 
 
 The generated bitstream was successfully programmed onto the VSDSquadron FPGA, completing hardware validation of the SPI Master IP.
 
-![FPGA Flash](screenshots/ss27_make_flash.png)
+![FPGA Flash](../screenshots/ss27_make_flash.png)
 
 # 8. Notes
 
