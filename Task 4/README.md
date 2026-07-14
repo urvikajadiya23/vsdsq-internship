@@ -210,19 +210,67 @@ Continuing the scroll: the complete `GPIO gpio_ip (...)` instantiation, `GPIO_OU
 
 At this point, the GPIO IP is no longer a standalone module — it is a live, addressable peripheral on the SoC's memory-mapped bus, ready for the Step 4 simulation validation.
 
-# Step 4: Validate GPIO IP using Simulation
+# Step 4: Software Validation
 
 ## Objective
-The GPIO Output IP (`gpio_ip.v`) was validated using a dedicated Verilog testbench (`gpio_testbench.v`) that directly drives the module's ports to verify write logic, readback logic, and output behavior — without needing the full SoC/CPU.
+The GPIO Output IP (`gpio_ip.v`) was validated using a dedicated Verilog testbench (`gpio_testbench.v`) that directly drives the module's ports to verify write logic, readback logic, and output behavior — without needing the full SoC/CPU and a C file.
 
 ## Files Involved
 - `gpio_ip.v` — GPIO IP RTL module
 - `gpio_testbench.v` — Testbench driving `mem_wdata`, `mem_wstrb`, `gpio_sel` and observing `gpio_out`, `gpio_rdata`
+- `gpio_test.c` - C file
 
 ---
 
-**Exploring the pre-installed firmware directory**
-![Exploring existing firmware](screenshots/ss23.png)
+A C program, `gpio_test.c`, was written to write values to the GPIO register
+and read them back, printing each result over UART.
+
+### Firmware source (`gpio_test.c`)
+
+![gpio_test.c — write, readback, and UART print logic](./screenshots/gpio_test_c.png)
+
+The program writes three test values to `GPIO_REG` (`0x1`, `0x1F`, `0x0`),
+reading back the register and printing the result via `uart_print_hex` after
+each write, then prints `GPIO TEST DONE` and terminates cleanly with
+`ebreak`.
+
+### Compilation
+
+The firmware was compiled with the RISC-V toolchain:
+
+![Compiling gpio_test.c to gpio_test.o](./screenshots/gpio_test_c_a.png)
+
+and linked into a bootable firmware image via the existing build flow, which
+also copies the resulting hex file into the RTL simulation directory as
+`firmware.hex`:
+
+![Building gpio_test.bram.hex — link, firmware_words, and RTL copy](./screenshots/gpio_test_c_b.png)
+
+### Full SoC Simulation
+
+The design was simulated end-to-end using Verilator, running the real CPU
+and memory-mapped bus — not an isolated module testbench — to validate the
+complete software-to-hardware path:
+
+![Verilator build and simulation run showing UART output](./screenshots/gpio_test_c_e.png)
+Simulation started...
+GPIO TEST START
+Wrote 0x1  Read=0x00000001
+Wrote 0x1F Read=0x0000001F
+Wrote 0x0  Read=0x00000000
+GPIO TEST DONE
+
+riscv.v:287: Verilog $finish
+Simulation complete.
+
+This confirms both required validation criteria:
+
+- **Correct register updates** — each write (`0x1`, `0x1F`, `0x0`) is
+  accepted by the GPIO register.
+- **Correct readback behavior** — each printed `Read=` value exactly matches
+  the value just written, confirmed via a genuine round-trip through the
+  register (the `volatile` pointer access forces an actual memory read, not
+  a cached value), all transmitted and observed through the real UART path.
 
 ## Testbench Design
 
