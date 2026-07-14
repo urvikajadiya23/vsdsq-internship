@@ -165,58 +165,50 @@ registers, address offset decoding, and correct read/write logic.
 The key principle: `GPIO_READ` is read-only, `GPIO_DATA` and
 `GPIO_DIR` are read-write.
 
-###  Before — Task-2 Port List
+###  Before — Port List
 
 ![ss11](screenshots/ss11_step_2_original.png)
 
 The original Task-2 port list kept as reference. Five ports total:
 `clk`, `mem_wdata [31:0]`, `mem_wstrb`, `gpio_sel`, `gpio_rdata [31:0]`,
 `gpio_out [4:0]`. No `mem_addr` port — this is the baseline before
-any Task-3 modifications begin.
+any modifications begin.
 
 ###  Updated gpio_ip.v — Ports, Wire, and Registers
 
-![ss12](screenshots/ss12_mulitple_reg_and_add_decoding.png)
+![gpio_ip.v header and offset decode](./screenshots/step2_a.png)
 
-The fully updated `gpio_ip.v` showing all structural changes:
-- `input [31:0] mem_addr` added as new port for address decoding
-- `wire [1:0] gpio_addr = mem_addr[3:2]` derived internally —
-  bits [3:2] select the target register without exposing decoding
-  as a port
-- `reg [31:0] gpio_data` — stores output data written by CPU
-- `reg [31:0] gpio_dir` — stores direction configuration
-- `wire [31:0] gpio_readback = {27'b0, gpio_out}` — read-only,
-  upper 27 bits zero-padded, lower 5 bits reflect actual LED pin
-  state driven by `gpio_out`
+Register storage is implemented as two synchronous registers, `gpio_data` and
+`gpio_dir`, each written on `posedge clk` only when `gpio_sel & mem_wstrb` is
+high and the address offset matches:
 
-###  Write Logic — case(gpio_addr)
+**Write logic:**
 
-![ss13](screenshots/ss13_add_decoding_implemented.png)
+![Write logic block](./screenshots/step2_b.png)
 
-The write always block triggered on `posedge clk` when
-`gpio_sel && mem_wstrb`:
-- `2'b00` → `gpio_data <= mem_wdata` — CPU writes output data
-- `2'b01` → `gpio_dir <= mem_wdata` — CPU configures direction
-- No case for `2'b10` — `GPIO_READ` is intentionally read-only,
-  CPU cannot write pin state
-- `default: ;` — explicit default prevents unintended latch
-  inference by the synthesizer
+`GPIO_READ` is not separately stored; it is computed as `gpio_dir & gpio_data`,
+so only bits configured as output (`gpio_dir` = 1) reflect their driven value,
+while input-configured bits read back 0 (documented limitation — no physical
+input pins are wired on this board):
 
-###  Readback Logic — Part 1
+**Readback mux:**
 
-![ss13b](screenshots/ss13b.png)
+![Readback logic block](./screenshots/step2_c.png)
 
-The read always block triggered on `posedge clk` when `gpio_sel`:
-- `2'b00` → `gpio_rdata <= gpio_data` — returns last written value
-- `2'b01` → `gpio_rdata <= gpio_dir` — returns direction register
-- `2'b10` → `gpio_rdata <= gpio_readback` — returns actual pin
-  state via the continuous wire assignment
-- `default: gpio_rdata <= 32'b0` — safe default for unmapped
-  offsets
+The LED output (`gpio_out`) is likewise gated by direction, so only
+output-configured bits actually drive the LEDs:
 
-###  GPIO Output Drive Logic — LED Mapping
-![ss13c](screenshots/ss13c.png)
-This block drives the GPIO output pins that connect to the LEDs. The lower 5 bits of `gpio_data` are mapped to the 5 onboard LEDs. On every `posedge clk`, `gpio_out` is updated synchronously with `gpio_data[4:0]`, ensuring clean, glitch-free output without any latch behavior. This corresponds to the `GPIO_DATA` register's output-driving function from the Task-3 register map (offset `0x00`), where writes to `GPIO_DATA` are reflected on the physical output pins.
+**LED output drive:**
+
+![LED output drive block](./screenshots/step2_d.png)
+
+All register writes use non-blocking assignments in `always @(posedge clk)`
+blocks, and the readback mux uses blocking assignments in a single
+`always @(*)` block with a complete `if/else` and `default` case, avoiding
+unintended latch inference. Correctness was validated with a dedicated
+testbench exercising all three offsets, including a direction-masking test
+(DIR=0x01, DATA=0x1F → READ=0x01) confirming that direction control is
+functionally enforced, not just stored.
 
 ###  riscv.v Instantiation Update
 
@@ -306,152 +298,92 @@ through the SoC:
 - Lines 410–411: `mem_rdata` final assignment confirmed —
   `IO_rdata` feeds into the main data bus when not accessing RAM
 
-  ## Step 4: Software Validation
+## Step 4: Software Validation
 
-Validation was done in two parts:
-- A Verilog testbench directly driving the GPIO IP ports to
-  verify all three registers behave correctly at the RTL level
-- A C program validating the register logic at the software level
+A C program, `gpio_multi_test.c`, was written to exercise the full GPIO
+Control IP register map through actual firmware execution — setting
+direction, writing data, and reading back status — with all results printed
+over UART. Validation was performed both at the module level (standalone
+testbench) and end-to-end through the full SoC simulation.
 
-###  Firmware C File Created
+### Module-Level Testbench (`gpio_multi_test.v`)
 
-![ss19_c](screenshots/ss19_gpio_multi_test.c.png)
+**Testbench structure and DUT instantiation:**
 
-`gpio_multi_test.c` created in `Firmware/` by copying from
-`gpio_test.c` as a starting point. The file is then opened in
-`nano` for editing to add multi-register test logic covering
-`GPIO_DIR`, `GPIO_DATA`, and `GPIO_READBACK`.
+![Testbench structure — clk gen, VCD dump, DUT instantiation](./screenshots/step4_a.png)
 
-###  Updated Verilog Testbench
+**Helper tasks (`do_write` / `do_read`):**
 
-![ss19_tb](screenshots/ss19_gpio_testbench.png)
+![do_write and do_read helper tasks](./screenshots/step4_b.png)
 
-Updated `gpio_testbench.v` shown after modifications for Task-3.
-Key changes from Task-2 testbench:
-- `reg [31:0] mem_addr` added as new signal declaration
-- `.mem_addr(mem_addr)` added to GPIO instantiation port list
-- `mem_addr = 0` added to initialization block
-- Clock generation: `initial clk = 0; always #5 clk = ~clk`
-- VCD dump enabled: `$dumpfile("gpio_ip_tb.vcd")` and
-  `$dumpvars(0, gpio_ip_tb)` for GTKWave waveform capture
-- Test sequence begins with all signals initialized to zero
-  before any register access
+**Direction-masking test cases (Tests 2–6):**
 
-###  Test Sequence — Part 1
+![Test cases covering DATA write, DIR masking, and sel=0 hold](./screenshots/step4_c.png)
 
-![ss20_a](screenshots/ss20_cat_gpio_test_new.png)
+**Testbench completion:**
 
-First half of the test sequence showing Tests 1–3:
-- `mem_addr = 32'h400020` set before each GPIO_DATA write
-- Test1: writes `0x00000001` → verifies basic write to GPIO_DATA
-- Test2: writes `0x0000001F` → sets all 5 LED bits high
-- Test3: writes `0x0000000A` → pattern `01010` on LEDs
-- Each test: `gpio_sel=1`, `mem_wstrb=1` to trigger write,
-  then deasserted, then `$display` captures `gpio_out` and
-  `gpio_rdata` for verification
+![$finish and endmodule](./screenshots/step4_d.png)
 
-###  Test Sequence — Part 2
+**Console output (`iverilog` + `vvp`):**
 
-![ss20_cat](screenshots/ss20_a.png)
+![iverilog/vvp console output — all 6 tests passing](./screenshots/step4_e.png)
+Test1 DIR=0x1F          gpio_dir_read=0x0000001f
+Test2 DATA=0x15 (all output) gpio_out=10101  gpio_read=0x00000015
+Test3 DIR=0x01 DATA=0x1F -> gpio_out=00001  gpio_read=0x00000001 (expect masked to 0x01)
+Test4 DIR=0x00 DATA=0x1F -> gpio_out=00000  gpio_read=0x00000000 (expect 0x00)
+Test5 GPIO_DATA readback = 0x0000001f (expect last written 0x1F)
+Test6 (sel=0, should be unchanged) gpio_out=00000  gpio_read=0x0000001f
+=== GPIO Control IP Testbench Done ===
+**GTKWave waveform:**
 
-Second half of the test sequence showing Tests 4–6:
-- Test4: writes `0x00000015` → pattern `10101` on LEDs
-- Test5: writes `0x00000000` → clears all LED outputs
-- Test6: `gpio_sel=0`, `mem_wstrb=1` — write attempted with
-  peripheral deselected, output should remain unchanged,
-  validating that `gpio_sel` correctly gates all writes
-- `$display("=== GPIO IP Testbench Done ===")` and `$finish`
-  cleanly terminate simulation
+![GTKWave — gpio_addr, gpio_data, gpio_dir, gpio_out, gpio_rdata across all test cases](./screenshots/step4_f.png)
 
-###  Compile and Run Simulation
+### Firmware source (`gpio_multi_test.c`)
 
-![ss21](screenshots/ss21.png)
+![gpio_multi_test.c part 1](./screenshots/step4_g_a.png)
+![gpio_multi_test.c part 2 — GPIO TEST DONE + ebreak](./screenshots/step4_g_b.png)
 
-Simulation compiled and run:
-- `iverilog -o gpio_simulation gpio_ip.v gpio_testbench.v` —
-  compiles both the GPIO IP and testbench into a single
-  simulation executable
-- `vvp gpio_simulation` — runs the simulation
-- Output confirms:
-  - `VCD info: dumpfile gpio_ip_tb.vcd opened for output`
-  - All 6 tests execute and print results
-  - `gpio_testbench.v:110: $finish called at 126000 (1ps)`
-  - Simulation completes cleanly with no errors
+Sets `GPIO_DIR_REG`, writes `GPIO_DATA_REG`, and reads back `GPIO_READ_REG`,
+printing each step via `uart_print`/`uart_print_hex` — first with all 5 bits
+configured as output (`DIR=0x1F`, `DATA=0x15`), then with only bit 0 as
+output (`DIR=0x01`, `DATA=0x1F`), to explicitly validate direction-based
+masking. The program terminates cleanly with `ebreak`.
 
-###  Simulation Output — Register Verification
+### Full SoC Simulation (primary proof)
 
-![ss22](screenshots/ss22.png)
+The firmware was compiled with the RISC-V toolchain, linked into
+`gpio_multi_test.bram.hex`, loaded as `firmware.hex`, and simulated
+end-to-end with Verilator (`make sim`) — running the real CPU and
+memory-mapped bus, not an isolated module testbench:
 
-Full simulation output verifying all register behavior:
+![Full SoC simulation output showing correct GPIO writes and readback](./screenshots/step4_h.png)
 
-| Test | Write Value | gpio_out | gpio_rdata |
-|------|------------|----------|------------|
-| Test1 | `0x1` | `00001` | `0x00000001` |
-| Test2 | `0x1F` | `11111` | `0x0000001f` |
-| Test3 | `0xA` | `01010` | `0x0000000a` |
-| Test4 | `0x15` | `10101` | `0x00000015` |
-| Test5 | `0x0` | `00000` | `0x00000000` |
-| Test6 | `sel=0` | `00000` | `0x00000000` |
+[GPIO-DEBUG] write addr=00400024 data=0000001f
+[GPIO-DEBUG] write addr=00400020 data=00000015
+[GPIO-DEBUG] read  addr=00400028 rdata=00000015
+[GPIO-DEBUG] write addr=00400024 data=00000001
+[GPIO-DEBUG] write addr=00400020 data=0000001f
+[GPIO-DEBUG] read  addr=00400028 rdata=00000001
 
-Every write to `GPIO_DATA` is correctly reflected in both
-`gpio_out` (5-bit LED pattern) and `gpio_rdata` (32-bit readback).
-Test6 confirms peripheral select gating works — no change when
-`gpio_sel=0`.
+riscv.v:287: Verilog $finish
+Simulation complete.
 
-###  GTKWave Waveform
+This confirms all three expected validation criteria through the CPU-driven
+software path:
 
-![ss23](screenshots/ss23.png)
+- **Direction control works** — `GPIO_DIR` writes (`0x1F`, then `0x01`) are
+  correctly applied before each subsequent data write.
+- **Output updates are reflected** — with `DIR=0x1F` (all output),
+  `GPIO_READ` returns `0x15`, exactly matching the value written to
+  `GPIO_DATA`.
+- **Readback behaves as expected** — with `DIR=0x01` (only bit 0 as output),
+  `GPIO_READ` correctly masks the written value `0x1F` down to `0x01`,
+  proving direction-aware readback rather than a raw echo of `GPIO_DATA`.
 
-GTKWave waveform opened from `gpio_ip_tb.vcd` showing all signals
-across the full 126ns simulation:
-- `gpio_out[4:0]` — transitions through `01`, `1F`, `0A`, `15`,
-  `00` matching each test write
-- `gpio_rdata[31:0]` — tracks each written value with one clock
-  cycle latency due to synchronous readback
-- `mem_addr[31:0]` — shows `00400020` held constant confirming
-  all writes targeting `GPIO_DATA` register
-- `mem_wdata[31:0]` — shows each test value written in sequence
-- `mem_wstrb` — pulses high for each write transaction then
-  deasserts cleanly
-
-###  GTKWave Launch Command
-
-![ss24](screenshots/ss24.png)
-
-`gtkwave gpio_ip_tb.vcd` launch output confirming:
-- GTKWave Analyzer v3.3.116 loaded successfully
-- `[0] start time` and `[126000] end time` matching simulation
-  duration
-- Waveform reloaded and displayed without errors
-- `WM Destroy` on close confirms clean exit
-
-###  C Software Validation — Program
-
-![ss25](screenshots/ss25.png)
-
-`test.c` written in `Firmware/` as a standalone C-level software
-validation:
-- `GPIO_DIR_VALUE = 0xFF` — all pins configured as output
-- `GPIO_DATA_VALUE = 0xA5` — test pattern `10100101`
-- Simulates a GPIO write by assigning `gpio_read = GPIO_DATA_VALUE`
-- Checks if `gpio_read == GPIO_DATA_VALUE` — verifies data
-  integrity of the register write-read cycle
-- Prints `GPIO SUCCESSFULLY VERIFIED` on pass, 
-  `GPIO VERIFICATION FAILED` on fail
-
-###  C Software Validation — Compile and Run
-
-![ss26](screenshots/ss26.png)
-
-`test.c` compiled with `gcc test.c -o test` and executed with
-`./test`. Output confirms:
-- `GPIO_DIR = 0xFF` — direction register set correctly
-- `GPIO_DATA = 0xA5` — data written successfully
-- `GPIO_READ = 0xA5` — readback matches written value
-- `GPIO SUCCESSFULLY VERIFIED` — end-to-end register
-  write-read cycle validated at software level
-
----
+Together, the module-level testbench and full-SoC simulation provide
+consistent, matching proof that direction control, output updates, and
+direction-aware readback all function correctly end-to-end — from C firmware
+through the real CPU/bus, down to the register-level logic inside the IP.
 
 ## Summary
 
