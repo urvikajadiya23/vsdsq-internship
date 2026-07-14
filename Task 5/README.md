@@ -11,7 +11,7 @@ control, and full software validation running on the RISC-V core.
 ## IP Specification
 
 **IP Name:** GPIO Control IP  
-**Base Address:** `0x400000`
+**Base Address:** `0x400020`
 
 | Offset | Register | Description |
 |--------|----------|-------------|
@@ -34,7 +34,7 @@ select which register is being accessed inside the IP.
 
 ## Step 1: Study and Plan
 
-Before writing any code, the existing Task-2 `gpio_ip.v` was
+Before writing any code, the existing `gpio_ip.v` was
 studied in detail to understand the current structure and identify
 exactly where changes need to be made.
 
@@ -306,38 +306,6 @@ direction, writing data, and reading back status — with all results printed
 over UART. Validation was performed both at the module level (standalone
 testbench) and end-to-end through the full SoC simulation.
 
-### Module-Level Testbench (`gpio_multi_test.v`)
-
-**Testbench structure and DUT instantiation:**
-
-![Testbench structure — clk gen, VCD dump, DUT instantiation](./screenshots/step4_a.png)
-
-**Helper tasks (`do_write` / `do_read`):**
-
-![do_write and do_read helper tasks](./screenshots/step4_b.png)
-
-**Direction-masking test cases (Tests 2–6):**
-
-![Test cases covering DATA write, DIR masking, and sel=0 hold](./screenshots/step4_c.png)
-
-**Testbench completion:**
-
-![$finish and endmodule](./screenshots/step4_d.png)
-
-**Console output (`iverilog` + `vvp`):**
-
-![iverilog/vvp console output — all 6 tests passing](./screenshots/step4_e.png)
-Test1 DIR=0x1F          gpio_dir_read=0x0000001f
-Test2 DATA=0x15 (all output) gpio_out=10101  gpio_read=0x00000015
-Test3 DIR=0x01 DATA=0x1F -> gpio_out=00001  gpio_read=0x00000001 (expect masked to 0x01)
-Test4 DIR=0x00 DATA=0x1F -> gpio_out=00000  gpio_read=0x00000000 (expect 0x00)
-Test5 GPIO_DATA readback = 0x0000001f (expect last written 0x1F)
-Test6 (sel=0, should be unchanged) gpio_out=00000  gpio_read=0x0000001f
-=== GPIO Control IP Testbench Done ===
-**GTKWave waveform:**
-
-![GTKWave — gpio_addr, gpio_data, gpio_dir, gpio_out, gpio_rdata across all test cases](./screenshots/step4_f.png)
-
 ### Firmware source (`gpio_multi_test.c`)
 
 ![gpio_multi_test.c part 1](./screenshots/step4_g_a.png)
@@ -379,17 +347,54 @@ software path:
 - **Readback behaves as expected** — with `DIR=0x01` (only bit 0 as output),
   `GPIO_READ` correctly masks the written value `0x1F` down to `0x01`,
   proving direction-aware readback rather than a raw echo of `GPIO_DATA`.
+  
+### Module-Level Testbench (`gpio_multi_test.v`)
+
+**Testbench structure and DUT instantiation:**
+
+![Testbench structure — clk gen, VCD dump, DUT instantiation](./screenshots/step4_a.png)
+
+**Helper tasks (`do_write` / `do_read`):**
+
+![do_write and do_read helper tasks](./screenshots/step4_b.png)
+
+**Direction-masking test cases (Tests 2–6):**
+
+![Test cases covering DATA write, DIR masking, and sel=0 hold](./screenshots/step4_c.png)
+
+**Testbench completion:**
+
+![$finish and endmodule](./screenshots/step4_d.png)
+
+**Console output (`iverilog` + `vvp`):**
+
+![iverilog/vvp console output — all 6 tests passing](./screenshots/step4_e.png)
+Test1 DIR=0x1F          gpio_dir_read=0x0000001f
+Test2 DATA=0x15 (all output) gpio_out=10101  gpio_read=0x00000015
+Test3 DIR=0x01 DATA=0x1F -> gpio_out=00001  gpio_read=0x00000001 (expect masked to 0x01)
+Test4 DIR=0x00 DATA=0x1F -> gpio_out=00000  gpio_read=0x00000000 (expect 0x00)
+Test5 GPIO_DATA readback = 0x0000001f (expect last written 0x1F)
+Test6 (sel=0, should be unchanged) gpio_out=00000  gpio_read=0x0000001f
+=== GPIO Control IP Testbench Done ===
+**GTKWave waveform:**
+
+![GTKWave — gpio_addr, gpio_data, gpio_dir, gpio_out, gpio_rdata across all test cases](./screenshots/step4_f.png)
 
 Together, the module-level testbench and full-SoC simulation provide
 consistent, matching proof that direction control, output updates, and
 direction-aware readback all function correctly end-to-end — from C firmware
 through the real CPU/bus, down to the register-level logic inside the IP.
 
+##
+Address offset decoding: The top-level gpio_sel chip-select (from Task-2's one-hot isIO & mem_wordaddr[IO_GPIO_bit]) is reused unchanged. Inside gpio_ip.v, the lower two address bits (mem_addr[3:2]) are extracted as gpio_addr, giving three sub-offsets: 00 = GPIO_DATA (0x00), 01 = GPIO_DIR (0x04), 10 = GPIO_READ (0x08). A case(gpio_addr) block routes writes and reads to the correct register.
+
+Direction's effect: GPIO_DIR is a per-bit mask — 1 = output, 0 = input. It doesn't gate whether GPIO_DATA itself can be written or read back (that always reflects the raw stored value). Instead, it gates what's actually driven out: GPIO_READ and gpio_out are both computed as gpio_dir & gpio_data, so only bits configured as output show their driven value; input-configured bits read back 0 (since no physical input pins are wired on this board).
+
 ## Summary
 
 | Step | What Was Done | Result |
 |------|--------------|--------|
-| Step 1 | Studied Task-2 GPIO IP, planned register map and internal signals | Planning complete |
+| Step 1 | Studied GPIO IP, planned register map and internal signals | Planning complete |
 | Step 2 | Extended `gpio_ip.v` with 3 registers, address decoding, correct read/write logic | RTL complete |
 | Step 3 | Updated `riscv.v` instantiation, verified full signal routing | Integration complete |
 | Step 4 | Verilog testbench simulation + C software validation | All tests passed |
