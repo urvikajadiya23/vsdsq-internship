@@ -20,7 +20,7 @@ Working directory:
 
 ![Directory](screenshots/ss1_directory.png)
 
-**SPI Base Address = `0x400030`**
+**SPI Base Address = `0x400040`**
 
 | Offset | Register | Description            |
 |--------|----------|-------------------------|
@@ -28,8 +28,6 @@ Working directory:
 | 0x04   | TXDATA   | Transmit byte           |
 | 0x08   | RXDATA   | Received byte           |
 | 0x0C   | STATUS   | Busy and Done flags     |
-
-![Register map](screenshots/ss2_add_plan.png)
 
 Block-level structure — CPU connects through the memory bus and address
 decoder into the SPI Master, which contains the register bank, shift
@@ -46,18 +44,16 @@ register, clock divider, and control FSM, driving the physical `CS`,
 
 ---
 
-## Step 3: RTL Implementation
-
+## RTL Implementation
+ 
 ### Module declaration and register bank
-
 `SPI_MASTER` exposes a standard memory-mapped bus interface
 (`spi_sel`, `spi_addr`, `mem_wstrb`, `mem_wdata`, `spi_rdata`) plus the
 four SPI pins (`sclk`, `mosi`, `miso`, `cs_n`).
-
-![Module + registers](screenshots/ss5_cat.png)
-
+ 
+![Module + registers](screenshots/step1_a.png)
+ 
 ### Register write logic and read mux
-
 - `CTRL` (offset `2'b00`) and `TXDATA` (offset `2'b01`) are written
   directly from the bus.
 - `STATUS` (offset `2'b11`) supports write-1-to-clear on the `DONE` bit
@@ -67,37 +63,36 @@ four SPI pins (`sclk`, `mosi`, `miso`, `cs_n`).
   (`en && start && !busy`).
 - The read mux returns the correct register for each offset, and `32'd0`
   for undefined offsets, per spec.
-
-![Write logic + read mux](screenshots/ss5_cat_b.png)
-
-Read mux default case (returns 0 when `spi_sel` is low):
-
-![Read mux default](screenshots/ss5_cat_c.png)
-
+![Write logic + FSM trigger](screenshots/step1_b.png)
+ 
 ### Transfer FSM (Mode 0)
-
 On `en && start && !busy`:
 - `cs_n` is pulled low, `busy` is set, `tx_shift` is loaded from
   `tx_reg[7:0]`, and the first MOSI bit (`tx_reg[7]`) is driven out.
-
 While `busy`, on each clock-divider tick (`clk_count == clkdiv`):
 - `sclk` toggles.
 - **MISO is sampled** on the edge where `sclk` is about to go high
   (rising-edge sample), shifting into `rx_shift`.
 - **MOSI is shifted out** on the falling edge (`tx_shift` advances).
-
-![FSM start + sampling](screenshots/ss5_cat_d.png)
-
 On `bit_count == 4'd7` (8th bit complete):
 - `busy` clears, `done` and `STATUS.DONE` are set, `cs_n` returns high,
   `sclk` returns low, and the final received byte is latched into
   `rx_reg`.
+![FSM shift + sampling + completion](screenshots/step1_c.png)
+ 
+### Read mux
+- `spi_addr` selects `CTRL` / `TXDATA` / `RXDATA` / `STATUS` when `spi_sel`
+  is asserted.
+- Returns `32'd0` when `spi_sel` is low, per spec.
+![Read mux logic](screenshots/step1_d.png)
 
+ 
+viewing the RTL directory
 ![FSM completion + endmodule](screenshots/ss6.png)
 
 ---
 
-## Step 4: SoC Integration (`riscv.v`)
+## Step 3: SoC Integration (`riscv.v`)
 
 ### IO address decode
 
@@ -127,17 +122,9 @@ Standard gearbox/reset instantiation:
 
 ![Clockworks](screenshots/ss11_clockwork.png)
 
-### Simulation loopback for MISO
-
-Under `BENCH`, `spi_miso` is tied directly to `spi_mosi` to emulate a
-loopback connection during simulation, satisfying the spec's
-"MISO loopback" validation requirement:
-
-![MISO loopback](screenshots/ss12_.png)
-
 ---
 
-## Step 5: Verilator Testbench Harness
+##  Verilator Testbench Harness
 
 Standard `sim_main.cpp` Verilator harness — drives `CLK`/`RESET`, then
 runs the simulation for a fixed number of clock edges:
@@ -146,55 +133,61 @@ runs the simulation for a fixed number of clock edges:
 
 ---
 
-## Step 6: Firmware — `spi_test.c`
+## Step 4a: Firmware — LED and UART Demonstration (`spi_test.c`)
 
-Full firmware source. Memory-mapped register addresses match the SoC's
-`IO_BASE + offset` scheme:
+This firmware validates the LED output and UART transmit paths of the SoC
+independently of the SPI Master IP. It runs on the same memory-mapped bus
+and toolchain used across the project, providing a baseline confirmation
+that the core, memory map, and peripherals function correctly before
+layering SPI-specific tests on top.
 
-- `SPI_CTRL` = `0x400040`
-- `SPI_TXDATA` = `0x400044`
-- `SPI_RXDATA` = `0x400048`
-- `SPI_STATUS` = `0x40004C`
+### Memory Map
+| Define | Address | Description |
+|--------|---------|--------------|
+| `LEDS` | `0x400000` | LED output register (bits [4:0]) |
+| `UART_DATA` | `0x400008` | UART transmit data register |
+| `UART_CTRL` | `0x400010` | UART status register (bit 9 = TX busy) |
 
-![spi_test.c full](screenshots/ss14_spi_test_c.png)
+### Code Structure
+- `delay()` — busy-wait loop implemented with `nop` instructions, used to
+  time the LED toggling interval.
+- `uart_putchar()` / `uart_print()` — polls `UART_CTRL` bit 9 to ensure the
+  UART is not busy before writing each byte to `UART_DATA`.
+- `uart_print_hex8()` — formats and prints an 8-bit value in `0xNN` form.
+- `main()` — prints a boot banner, then enters an infinite loop that drives
+  `LEDS` high (`0x1F`), logs the state over UART, delays, drives `LEDS` low
+  (`0x00`), logs the state, and repeats.
 
-The test:
-1. Prints `"SPI TEST START"` over UART.
-2. Configures `SPI_CTRL` with `EN=1` and `CLKDIV=2`.
-3. Writes `0xA5` to `SPI_TXDATA`.
-4. Sets the `START` bit.
-5. Polls `SPI_STATUS` bit 1 (`DONE`).
-6. Reads back `SPI_RXDATA` and prints it in hex over UART.
+![Includes, register definitions, and UART helper functions](screenshots/step3_a.png)
+![Main loop driving LED output and UART logging](screenshots/step3_b.png)
 
-![spi_test.c — poll/print tail](screenshots/ss14_b.png)
+### Build and Simulation Flow
+The firmware is compiled with the RISC-V GCC toolchain
+(`riscv64-unknown-elf-gcc`/`as`/`ld`), converted to a hex image with
+`firmware_words`, and copied into the RTL directory. The design is then
+built and simulated with Verilator (`--trace`, top module `SOC`) alongside
+`riscv.v`, `spi_master.v`, and `sb_hfosc_stub.v`.
 
-### Building the firmware
+![Compilation, linking, and hex generation](screenshots/step3_c.png)
+![Verilator build and simulation execution](screenshots/step3_d.png)
 
-Compiled with the standard `riscv64-unknown-elf` toolchain into an ELF,
-then linked against the board's `bram.ld`:
+### Simulation Output
+System Booted!
+LED + UART Demo
+LED = 0x1F ON
+LED = 0x00 OFF
+LED = 0x1F ON
+Simulation complete.
 
-![Build spi_test firmware](screenshots/ss15_test.png)
-
-Converted to a BRAM-loadable hex image with `firmware_words`:
-
-```
-RAM SIZE = 6144
-LOAD ELF: spi_test.bram.elf   max address = 3001
-Code size: 750 words (total RAM size: 1536 words)
-Occupancy: 48%
-SAVE HEX: spi_test.hex
-```
-
-![firmware_words hex generation](screenshots/ss16_hex.png)
-
-`spi_test.hex` is copied into `RTL/firmware.hex` before synthesis/sim,
-so the CPU's BRAM is initialized with this exact program.
+### Conclusion
+The simulation confirms correct, synchronized operation of the LED output
+and UART transmit paths, establishing a verified baseline for the SoC's
+peripheral and memory-mapped I/O interfaces.
 
 ---
+## Step 4b: Testbench and Waveform Results
 
-## Step 7: Simulation Results
-
-### 7a. Standalone IP-level testbench (`spi_master_test.v`)
+### Standalone IP-level testbench (`spi_master_test.v`)
 
 A self-checking testbench instantiates `SPI_MASTER` directly (not the
 full SoC), ties `miso = mosi` for loopback, and provides a `write_reg`
@@ -208,7 +201,7 @@ Sequence: write `CTRL = 0x201` (EN=1, CLKDIV=2) → write `TXDATA = 0xA5`
 
 ![Testbench — sequence + self-check](screenshots/ss18_tb_b.png)
 
-### 7b. Icarus Verilog run
+### Icarus Verilog run
 
 ```
 $ iverilog -o spi_sim spi_master_test.v spi_master.v
@@ -233,7 +226,7 @@ PASS: RXDATA == 0xA5
 `RXDATA` exactly matches the transmitted byte under loopback, confirming
 correct Mode 0 shift/sample timing.
 
-### 7c. GTKWave waveform
+###  GTKWave waveform
 
 `bit_count` advances 0→8 across the transfer; `tx_shift` shifts out
 `A5 → 4A → 94 → 28 → 50 → A0 → 40 → 80` (MSB-first); `rx_shift`
@@ -244,28 +237,9 @@ transfer window, `cs_n` is low during the transfer:
 
 ![GTKWave reload / session log](screenshots/ss21_gtk.png)
 
-### 7d. Full-SoC Verilator simulation
-
-`make sim` builds the complete SoC (`riscv.v` + `spi_master.v` +
-`sb_hfosc_stub.v` + `sim_main.cpp`), running the actual `spi_test.c`
-firmware on the CPU end-to-end through the memory bus and address
-decoder — not just the isolated IP:
-
-```
-Simulation started...
-SPI TEST START  RX = 0x000000A5
-SPI TEST DONE   Simulation complete.
-```
-
-![Full-SoC Verilator simulation](screenshots/ss17_make_sim.png)
-
-This confirms the SPI Master works correctly through the full SoC
-integration path: CPU → bus → address decode → `SPI_MASTER` → loopback
-→ firmware read-back — matching the standalone IP-level result exactly.
-
 ---
 
-## Step 8: Hardware Validation
+## Step 5: Hardware Validation
 
 End-to-end flow for getting the SPI Master IP onto the VSDSquadron FM board: SOC port wiring → pin constraints → loopback → simulation check → build → flash → UART validation.
 
@@ -292,7 +266,7 @@ module SOC (
 
 Note `spi_miso_pin` isn't in this list — MISO is handled internally via loopback rather than as an external pin (see Step 3).
 
-![SOC module port list with SPI pins added](screenshots/s23_modify_SOC.png)
+![SOC module port list with SPI pins added](screenshots/step5_a.png)
 
 ---
 
@@ -320,51 +294,6 @@ Final `VSDSquadronFM.pcf` correctly lists `RXD 3` on its own line, followed by t
 
 ---
 
-## Internal MISO Loopback (Top-Level Wiring)
-
-No external jumper wire is available on this setup, so `spi_miso` is tied directly to `spi_mosi` **inside the FPGA fabric**, alongside the normal pin assignments:
-
-```verilog
-assign spi_sclk_pin  = spi_sclk;
-assign spi_mosi_pin  = spi_mosi;
-assign spi_cs_n_pin  = spi_cs_n;
-
-// Internal loopback (no physical jumper wire available):
-// MISO is tied to MOSI inside the FPGA fabric itself, so the
-// hardware test exercises the real SPI_MASTER FSM/shift logic
-// on silicon, without requiring an external MOSI->MISO jumper.
-assign spi_miso = spi_mosi;
-```
-
-This still exercises the real SPI Master FSM and shift-register logic on real hardware — it just avoids relying on a physical wire for the loopback path.
-
-![Internal loopback wiring](screenshots/ss23_modification.png)
-
----
-
-##  Simulation Sanity Check (Pre-Hardware)
-
-Before flashing, `make sim` was re-run to confirm the RTL was still functionally correct after the port/pin/wiring changes:
-
-```bash
-make sim
-```
-
-Output confirmed the loopback test passes at the simulation level:
-
-```
-Simulation started...
-SPI TEST START
-RX = 0x000000A5
-SPI TEST DONE. Simulation complete.
-```
-
-`RX = 0xA5` matches the byte written to `TXDATA`, confirming the shift logic and loopback path are correct before moving to the board.
-
-![Simulation still passing after wiring changes](screenshots/ss24_sim_intact.png)
-
----
-
 ##  Adding the IP to the Build (Makefile)
 
 `spi_master.v` was added alongside `riscv.v` in the Makefile's `VERILOG_FILE` list so every downstream target (`build`, `sim`) compiles them together:
@@ -385,16 +314,9 @@ make build
 
 This runs Yosys synthesis → nextpnr-ice40 place & route → icetime static timing analysis → icepack bitstream packing.
 
-**Result:** timing closed comfortably — max clock frequency came out to **17.24 MHz**, well above the 12 MHz constraint (PASS). One harmless warning was reported for the HFOSC cell (expected — it's not a timing-analyzable path).
+**Result:** timing closed comfortably — max clock frequency came out to **16.32 MHz**, well above the 12 MHz constraint (PASS).
 
-```
-Info: Max frequency for clock 'clk': 17.24 MHz (PASS at 12.00 MHz)
-...
-1 warning, 0 errors
-Info: Program finished normally.
-```
-
-![make build output — timing PASS at 17.24 MHz](screenshots/ss26_make_build.png)
+![make build output — timing PASS at 17.24 MHz](screenshots/step6_b.png)
 
 ---
 
@@ -421,42 +343,7 @@ Bye.
 ![sudo make flash — VERIFY OK](screenshots/ss27_make_flash.png)
 
 ---
-
-##  UART Terminal Validation (Unresolved)
-
-```bash
-sudo make terminal
-```
-
-`picocom` connected cleanly to `/dev/ttyUSB0` at 9600 baud and reported "Terminal ready" — but **no UART output ever appeared**, even after the SPI test firmware should have printed its TX/RX comparison.
-
-![picocom connected, port open, no output](screenshots/ss28.png)
-
-## Port Occupancy Check and checking dmesg log
-![](screenshots/ss29.png)
-
-Ran a full sweep of serial port state before re-attempting make terminal:
-ls -l /dev/ttyUSB* /dev/ttyACM* /dev/ttyS* — confirmed /dev/ttyUSB0 was present (device 188,0) alongside the standard set of unused legacy ttyS0–31 nodes.
-sudo lsof /dev/ttyUSB0 /dev/ttyUSB1 /dev/ttyACM0 and sudo lsof | grep -E 'ttyUSB|ttyACM|ttyS' — both returned no output, confirming no process (stale picocom/minicom session or otherwise) was holding any serial port open.
-ls /dev/ttyUSB* /dev/ttyACM* | wc -l — confirmed exactly one active USB-serial node.
-
-![](screenshots/ss30.png)
-Port occupancy is ruled out as the cause of the make terminal failure — the port was free and available at the time of testing. The dmesg log instead shows the FT232H repeatedly attaching and then disconnecting on its own (FTDI USB Serial Device converter now disconnected from ttyUSB0) within seconds of enumeration, with no competing process involved. This points to the USB link itself dropping (most likely VirtualBox USB passthrough instability) rather than a port-conflict issue.
-
-### Debugging steps already tried
-Before concluding this was a hardware/VM-level issue, I worked through the usual suspects one by one:
-
-RESET line pull-up — added it, no change in behavior.
-DTR / --noreset flag in picocom — tried disabling DTR-triggered reset, still no output.
-USB reattachment — detached and reattached the FTDI device in VirtualBox; it re-enumerates cleanly each time, but the terminal stays silent.
-Clean re-flash before every terminal attempt — every single flash reports a clean VERIFY OK, so the bitstream is landing on the FPGA correctly.
-Double-checked baud rate and device path — both confirmed correct (9600 baud, /dev/ttyUSB0).
-
-None of these moved the needle. What's notable is that every flash cycle completes with VERIFY OK, and cdone reads high, which means the FPGA is genuinely configured and running the bitstream — so the SPI Master IP itself and the synthesis/flash pipeline don't appear to be the problem. The failure seems narrowly isolated to the UART data path specifically.
-Where things stand: at this point, it looks less like an RTL or software bug and more like something at the board or VM-passthrough level — could be a cold solder joint, an actual defect on the board's UART/USB line, or a VirtualBox USB-serial quirk that's silently swallowing the data. Confirming which one it is would need testing on bare-metal hardware (or a different host OS), and ideally probing the FPGA's TX pin with a multimeter or scope to see whether it's actually toggling at all.
-
-![VSDSquadron FM board — powered, PWR LED on](screenshots/ss29_board.jpeg)
-
+Completion Pending: CH340 and jumper wires to be connected
 ---
 
 ## Brief description of the task
