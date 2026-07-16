@@ -21,6 +21,12 @@ module Memory (
 
    initial begin
        $readmemh("firmware.hex",MEM);
+
+`ifdef BENCH
+    $display("MEM[0] = %08X", MEM[0]);
+    $display("MEM[1] = %08X", MEM[1]);
+    $display("MEM[2] = %08X", MEM[2]);
+`endif
    end
 
    wire [29:0] word_addr = mem_addr[31:2];
@@ -258,6 +264,8 @@ module Processor (
 	 PC    <= 0;
 	 state <= FETCH_INSTR;
       end else begin
+
+         RegisterBank[0] <= 32'b0;
 	 if(writeBackEn && rdId != 0) begin
 	    RegisterBank[rdId] <= writeBackData;
 	    // $display("r%0d <= %b (%d) (%d)",rdId,writeBackData,writeBackData,$signed(writeBackData));
@@ -322,7 +330,8 @@ module SOC (
     output 	     TXD,  // UART transmit
     output 	     spi_sclk_pin, // SPI clock (hardware pin)
     output 	     spi_mosi_pin, // SPI MOSI (hardware pin)
-    output 	     spi_cs_n_pin  // SPI chip-select (hardware pin)
+    output 	     spi_cs_n_pin,  // SPI chip-select (hardware pin)
+ input      spi_miso_pin   
 );
 
    wire clk;
@@ -367,12 +376,12 @@ module SOC (
    localparam IO_GPIO_bit      = 3;  // W GPIO output register  // R status. bit 9: busy sending
    localparam IO_SPI_bit       = 4;
    
-   always @(posedge clk) begin
-      if(isIO & mem_wstrb & mem_wordaddr[IO_LEDS_bit]) begin
-	 LEDS <= mem_wdata;
-//	 $display("Value sent to LEDS: %b %d %d",mem_wdata,mem_wdata,$signed(mem_wdata));
-      end
-   end
+   reg [25:0] counter;
+
+always @(posedge clk) begin
+    counter <= counter + 1;
+    LEDS <= counter[25:21];
+end
 
    wire uart_valid = isIO & mem_wstrb & mem_wordaddr[IO_UART_DAT_bit];
    wire uart_ready;
@@ -414,7 +423,6 @@ wire spi_sclk;
 wire spi_mosi;
 wire spi_cs_n;
 
-wire spi_miso;
 
 
 SPI_MASTER spi_ip (
@@ -432,7 +440,7 @@ SPI_MASTER spi_ip (
 
 .sclk(spi_sclk),
 .mosi(spi_mosi),
-.miso(spi_miso),
+.miso(spi_miso_pin),
 .cs_n(spi_cs_n)
 );
 
@@ -440,11 +448,6 @@ assign spi_sclk_pin = spi_sclk;
 assign spi_mosi_pin = spi_mosi;
 assign spi_cs_n_pin = spi_cs_n;
 
-// Internal loopback (no physical jumper wire available):
-// MISO is tied to MOSI inside the FPGA fabric itself, so the
-// hardware test exercises the real SPI_MASTER FSM/shift logic
-// on silicon, without requiring an external MOSI->MISO jumper.
-assign spi_miso = spi_mosi;
 
    wire [4:0] GPIO_OUT;
    assign GPIO_OUT = gpio_out_wire;
