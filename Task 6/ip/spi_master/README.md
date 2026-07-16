@@ -107,7 +107,7 @@ Added `IO_SPI_bit = 4` to the existing 1-hot IO address decode scheme
 (`isIO & mem_wordaddr[IO_SPI_bit]`), and `SPI_MASTER` is instantiated as
 `spi_ip`, wired to the CPU's memory bus signals:
 
-![Instantiation](screenshots/ss8_instantiate_ip.png)
+![Instantiation](screenshots/step2.png)
 
 ### Read-data mux
 
@@ -133,13 +133,12 @@ runs the simulation for a fixed number of clock edges:
 
 ---
 
-## Step 4a: Firmware — LED and UART Demonstration (`spi_test.c`)
+## Step 4a: Firmware — SPI Loopback Test with LED and UART Demonstration (`spi_test.c`)
 
-This firmware validates the LED output and UART transmit paths of the SoC
-independently of the SPI Master IP. It runs on the same memory-mapped bus
-and toolchain used across the project, providing a baseline confirmation
-that the core, memory map, and peripherals function correctly before
-layering SPI-specific tests on top.
+This firmware performs an end-to-end validation of the SPI Master IP using
+an internal loopback test, followed by a continuous LED toggling sequence.
+It exercises the UART, LED, and SPI memory-mapped registers together,
+confirming that all peripherals operate correctly on the shared bus.
 
 ### Memory Map
 | Define | Address | Description |
@@ -147,6 +146,10 @@ layering SPI-specific tests on top.
 | `LEDS` | `0x400000` | LED output register (bits [4:0]) |
 | `UART_DATA` | `0x400008` | UART transmit data register |
 | `UART_CTRL` | `0x400010` | UART status register (bit 9 = TX busy) |
+| `SPI_CTRL` | `0x400040` | SPI control register (EN, START, CLKDIV) |
+| `SPI_TXDATA` | `0x400044` | SPI transmit data register |
+| `SPI_RXDATA` | `0x400048` | SPI receive data register |
+| `SPI_STATUS` | `0x40004C` | SPI status register (BUSY, DONE) |
 
 ### Code Structure
 - `delay()` — busy-wait loop implemented with `nop` instructions, used to
@@ -154,12 +157,18 @@ layering SPI-specific tests on top.
 - `uart_putchar()` / `uart_print()` — polls `UART_CTRL` bit 9 to ensure the
   UART is not busy before writing each byte to `UART_DATA`.
 - `uart_print_hex8()` — formats and prints an 8-bit value in `0xNN` form.
-- `main()` — prints a boot banner, then enters an infinite loop that drives
-  `LEDS` high (`0x1F`), logs the state over UART, delays, drives `LEDS` low
-  (`0x00`), logs the state, and repeats.
+- `main()`:
+  - Configures `SPI_CTRL` with `CLKDIV = 2` and `EN = 1`.
+  - Writes `0xA5` to `SPI_TXDATA` and logs the value over UART.
+  - Sets the `START` bit to launch the transfer.
+  - Polls `SPI_STATUS` until the `DONE` bit is set.
+  - Reads `SPI_RXDATA`, logs the received byte, and compares it against
+    `0xA5`, printing `PASS` or `FAIL` accordingly.
+  - Enters an infinite loop toggling `LEDS` between `0x1F` and `0x00` with
+    a fixed delay between each state.
 
 ![Includes, register definitions, and UART helper functions](screenshots/step3_a.png)
-![Main loop driving LED output and UART logging](screenshots/step3_b.png)
+![SPI loopback test sequence and LED toggling loop](screenshots/step3_b.png)
 
 ### Build and Simulation Flow
 The firmware is compiled with the RISC-V GCC toolchain
@@ -172,17 +181,17 @@ built and simulated with Verilator (`--trace`, top module `SOC`) alongside
 ![Verilator build and simulation execution](screenshots/step3_d.png)
 
 ### Simulation Output
-System Booted!
-LED + UART Demo
-LED = 0x1F ON
-LED = 0x00 OFF
-LED = 0x1F ON
+===== SPI LOOPBACK TEST =====
+Writing TXDATA = 0xA5
+Starting transfer...
+Received RXDATA = 0xA5
+PASS
 Simulation complete.
 
-### Conclusion
-The simulation confirms correct, synchronized operation of the LED output
-and UART transmit paths, establishing a verified baseline for the SoC's
-peripheral and memory-mapped I/O interfaces.
+The simulation confirms that the SPI Master IP correctly transmits and
+receives data in loopback mode, and that UART logging and LED control
+function correctly alongside the SPI transfer on the shared memory-mapped
+bus.
 
 ---
 ## Step 4b: Testbench and Waveform Results
@@ -241,7 +250,7 @@ transfer window, `cs_n` is low during the transfer:
 
 ## Step 5: Hardware Validation
 
-End-to-end flow for getting the SPI Master IP onto the VSDSquadron FM board: SOC port wiring → pin constraints → loopback → simulation check → build → flash → UART validation.
+End-to-end flow for getting the SPI Master IP onto the VSDSquadron FM board: SOC port wiring → pin constraints → simulation check → build → flash → UART validation.
 
 ---
 
@@ -347,10 +356,18 @@ Completion Pending: CH340 and jumper wires to be connected
 ---
 
 ## Brief description of the task
-The SPI Master IP is a minimal, single-byte Mode 0 (CPOL=0, CPHA=0) SPI controller integrated into the basicRISCV SoC as a memory-mapped peripheral at base address 0x400030. Software controls it through four 32-bit registers — CTRL for enabling the block, starting a transfer, and setting the clock divider; TXDATA for loading the byte to send; RXDATA for reading the byte received; and STATUS for polling busy/done state.
-Internally, the IP is built around a simple FSM that drives CS_N low at the start of a transfer, toggles SCLK at a rate set by the clock divider, and shifts one bit out on MOSI while sampling one bit in on MISO per clock edge — 8 bits per transfer, matching standard SPI Mode 0 timing (sample on rising edge, shift on falling edge). Once all 8 bits are exchanged, CS_N returns high, the received byte is latched into RXDATA, and the DONE flag is set for firmware to poll.
-The design was validated in three stages: a standalone Icarus Verilog testbench exercising the IP directly with a loopback (MISO = MOSI), confirming a transmitted 0xA5 is correctly received back; a full-SoC Verilator simulation running the actual C firmware (spi_test.c) through the CPU, memory bus, and address decoder end-to-end; and synthesis/place-and-route through the full iCE40 toolchain (yosys → nextpnr-ice40 → icetime → icepack), successfully meeting timing at 12 MHz .
-This confirms the SPI Master's register interface, bus integration, and core shift/sample logic all function correctly.
+
+Designed and integrated a memory-mapped SPI Master IP into a custom RISC-V SoC on the VSDSquadron FPGA platform using Verilog RTL. The SPI controller supports 8-bit full-duplex communication in SPI Mode 0 (CPOL=0, CPHA=0) with configurable clock division and control/status registers accessible through the processor's memory-mapped bus.
+The IP implements CTRL, TXDATA, RXDATA, and STATUS registers, supporting features such as enable, start, busy, done, and software-clearable status flags. Functional verification was performed using Verilator simulation with MOSI-to-MISO loopback, successfully transmitting and receiving the test byte 0xA5. The design was synthesized, programmed onto the FPGA, and validated through UART-based debug messages and onboard LED indications, demonstrating successful hardware integration with the RISC-V system.
+Technologies Used
+Verilog HDL
+RISC-V SoC Integration
+Memory-Mapped I/O
+SPI Protocol (Mode 0)
+Verilator
+Yosys
+nextpnr-ice40
+VSDSquadron FPGA
 
 ---
 
