@@ -22,11 +22,6 @@ module Memory (
    initial begin
        $readmemh("firmware.hex",MEM);
 
-`ifdef BENCH
-    $display("MEM[0] = %08X", MEM[0]);
-    $display("MEM[1] = %08X", MEM[1]);
-    $display("MEM[2] = %08X", MEM[2]);
-`endif
    end
 
    wire [29:0] word_addr = mem_addr[31:2];
@@ -292,7 +287,8 @@ module Processor (
 		       isStore ? STORE : 
 		       FETCH_INSTR;
 `ifdef BENCH      
-	      if(isSYSTEM) $finish();
+ if(isSYSTEM) $finish();
+   	
 `endif      
 	   end
 	   LOAD: begin
@@ -376,11 +372,11 @@ module SOC (
    localparam IO_GPIO_bit      = 3;  // W GPIO output register  // R status. bit 9: busy sending
    localparam IO_SPI_bit       = 4;
    
-   reg [25:0] counter;
-
+   
 always @(posedge clk) begin
-    counter <= counter + 1;
-    LEDS <= counter[25:21];
+   if(isIO & mem_wstrb & mem_wordaddr[IO_LEDS_bit]) begin
+      LEDS <= mem_wdata;
+   end
 end
 
    wire uart_valid = isIO & mem_wstrb & mem_wordaddr[IO_UART_DAT_bit];
