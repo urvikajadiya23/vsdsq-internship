@@ -8,36 +8,47 @@
 
 # 1. Introduction
 
-This document describes the integration procedure for the SPI Master IP into the VSDSquadron RISC-V SoC. It explains the required RTL modifications, address mapping, software interface, FPGA pin assignments, and validation procedure.
+This document describes the integration procedure for the SPI Master IP into the VSDSquadron RISC-V SoC. It explains the RTL modifications, address mapping, software interface, FPGA pin assignments, hardware setup, and validation procedure.
 
-The SPI Master is implemented as a memory-mapped peripheral and communicates with the processor through the existing SoC bus interface.
+The SPI Master is implemented as a memory-mapped peripheral that communicates with the RISC-V processor through the existing SoC bus interface. The design supports SPI Mode 0 (CPOL = 0, CPHA = 0) with configurable clock generation and full-duplex 8-bit transfers.
 
 ---
 
 # 2. Integration Overview
 
-The SPI Master IP connects directly to the SoC memory bus and is selected through address decoding.
+The SPI Master IP connects directly to the SoC memory bus and is selected using address decoding logic.
 
-The integration consists of the following steps:
+The integration procedure consists of the following steps:
 
 1. Add the SPI Master RTL module to the project.
-2. Instantiate the SPI Master inside the SoC top-level module.
-3. Decode the assigned SPI address range.
+2. Instantiate the SPI Master in the SoC top-level module.
+3. Allocate a memory-mapped address range.
 4. Connect the SPI read data to the processor bus.
-5. Export the SPI interface signals to the FPGA top level.
+5. Export SPI interface signals to the FPGA top level.
 6. Assign FPGA pins through the constraint file.
-7. Program the FPGA and execute the software demonstration.
+7. Build and program the FPGA.
+8. Execute the software demonstration.
+9. Verify UART output and SPI loopback operation.
 
 ---
 
 # 3. Required RTL Files
 
-The following RTL file is required:
+The SPI Master IP is implemented as a single RTL module.
 
 ```
 spi_master.v
 ```
-The SPI Master IP is implemented as a single self-contained RTL module (spi_master.v). No additional helper modules or dependencies are required.
+
+Additional project files used during integration include:
+
+```
+riscv.v
+sim_main.cpp
+spi_master_tb.v
+spi_test.c
+VSDSquadronFM.pcf
+```
 
 ---
 
@@ -49,215 +60,269 @@ The SPI Master occupies a 16-byte memory window beginning at:
 |--------------|-------------|
 | **0x400040** | SPI Master IP |
 
-The processor accesses the internal registers using the following offsets.
+The internal registers are mapped as follows.
 
-| Address | Register |
-|----------|----------|
-| 0x400040 | CTRL |
-| 0x400044 | TXDATA |
-| 0x400048 | RXDATA |
-| 0x40004C | STATUS |
+| Address | Register | Access |
+|----------|----------|--------|
+| 0x400040 | CTRL | R/W |
+| 0x400044 | TXDATA | W |
+| 0x400048 | RXDATA | R |
+| 0x40004C | STATUS | R/W |
 
-Address decoding inside the SoC generates the `spi_sel` signal whenever an access falls within this address range.
+The SoC address decoder generates the `spi_sel` signal whenever an access targets this address range.
 
 ---
 
 # 5. Bus Interface Connections
 
-The SPI Master connects to the existing processor bus using the following signals.
+The SPI Master interfaces directly with the processor bus.
 
 | Signal | Direction | Description |
 |---------|-----------|-------------|
 | clk | Input | System clock |
-| resetn | Input | Active-low system reset |
-| spi_sel | Input | Address decoder select |
-| spi_addr[1:0] | Input | Register offset |
+| resetn | Input | Active-low reset |
+| spi_sel | Input | Peripheral select |
+| spi_addr[1:0] | Input | Register address |
 | mem_wstrb | Input | Write enable |
-| mem_wdata[31:0] | Input | Processor write data |
-| spi_rdata[31:0] | Output | Read data returned to CPU |
+| mem_wdata[31:0] | Input | CPU write data |
+| spi_rdata[31:0] | Output | CPU read data |
 
 ---
 
 # 6. External SPI Signals
 
-The SPI Master exports the following signals to the FPGA top level.
+The SPI Master exports the following SPI interface signals.
 
 | Signal | Direction | Description |
 |---------|-----------|-------------|
-| sclk | Output | SPI Serial Clock |
+| sclk | Output | SPI Clock |
 | mosi | Output | Master Out Slave In |
 | miso | Input | Master In Slave Out |
 | cs_n | Output | Active-Low Chip Select |
 
-These signals form the SPI interface of the IP. During RTL simulation, the miso input is driven by a testbench loopback (assign miso = mosi;) to verify data transmission and reception. For FPGA validation, the SoC internally routes the SPI transmit path back to the receive path, allowing hardware verification without an external SPI slave device. The exported signals remain available for future connection to external SPI peripherals if required.
+For hardware validation, the **MOSI** output was connected directly to the **MISO** input using a jumper wire to create a hardware loopback. This allows transmitted data to be received back without requiring an external SPI slave device.
+
+The SPI interface can also be connected to external SPI peripherals such as EEPROMs, Flash memories, sensors, ADCs, and DACs.
 
 ---
 
 # 7. FPGA Pin Assignment
 
-The SPI interface is mapped to the VSDSquadron FPGA pins using the project constraint file (`VSDSquadronFM.pcf`).
+The SPI interface is exported to the FPGA through the project constraint file (`VSDSquadronFM.pcf`).
 
 ```text
-set_io spi_sclk_pin 9
-set_io spi_mosi_pin 10
-set_io spi_cs_n_pin 12
+set_io spi_sclk_pin   9
+set_io spi_mosi_pin  10
+set_io spi_miso_pin  11
+set_io spi_cs_n_pin  12
 ```
-These pin assignments expose the SPI interface for future external-device connectivity. However, hardware validation of this project was performed using an internal loopback connection within the SoC design, so no external SPI slave or jumper connections were required during testing.
 
-The current implementation performs validation using an internal MOSI-to-MISO loopback connection inside the RTL/test environment. Therefore, an external SPI slave device is not required for functional verification.
+During hardware testing:
+
+- MOSI was connected to MISO using a jumper wire.
+- A CH340 USB-to-UART converter was connected to the UART interface for serial output.
+
+This configuration enables complete hardware verification without requiring an external SPI slave.
 
 ---
 
 # 8. Software Integration
 
-Software accesses the SPI Master using memory-mapped I/O.
+The processor accesses the SPI Master using memory-mapped I/O.
 
 ```c
-#define SPI_CTRL   (*(volatile uint32_t *)(0x400040))
-#define SPI_TXDATA (*(volatile uint32_t *)(0x400044))
-#define SPI_RXDATA (*(volatile uint32_t *)(0x400048))
-#define SPI_STATUS (*(volatile uint32_t *)(0x40004C))
+#define SPI_CTRL    (*(volatile uint32_t *)(0x400040))
+#define SPI_TXDATA  (*(volatile uint32_t *)(0x400044))
+#define SPI_RXDATA  (*(volatile uint32_t *)(0x400048))
+#define SPI_STATUS  (*(volatile uint32_t *)(0x40004C))
 ```
 
-The basic software sequence is:
+Typical software sequence:
 
-1. Configure the clock divider.
-2. Enable the SPI Master.
-3. Write the transmit byte.
-4. Set the START bit.
-5. Poll the DONE flag.
-6. Read the received byte.
-7. Clear the DONE flag before initiating another transfer.
+1. Configure CLKDIV.
+2. Enable SPI.
+3. Write TXDATA.
+4. Set START.
+5. Poll DONE.
+6. Read RXDATA.
+7. Clear DONE.
+8. Repeat if additional transfers are required.
 
 ---
 
 # 9. Example Transaction
 
-The following example transmits the byte `0xA5`.
+Example software transaction:
 
 ```c
-SPI_CTRL = (1 << 0) | (2 << 8);
+SPI_CTRL = (2 << 8) | 0x01;
 
 SPI_TXDATA = 0xA5;
 
-SPI_CTRL |= (1 << 1);
+SPI_CTRL = (2 << 8) | 0x03;
 
-while (!(SPI_STATUS & (1 << 1)));
+while(!(SPI_STATUS & (1 << 1)));
 
-uint32_t data = SPI_RXDATA;
+uint32_t rx = SPI_RXDATA;
 
-/* Clear DONE if another transfer will be started */
 SPI_STATUS = (1 << 1);
 ```
 
-This software sequence is included in the project demonstration application.
+This sequence performs one complete SPI transfer.
 
 ---
 
-# 10. Simulation Validation
+# 10. RTL Simulation Validation
 
-RTL functionality was verified using the supplied Verilog testbench before hardware integration.
+The SPI Master was first verified using RTL simulation.
 
-The simulation environment uses a loopback configuration by connecting the SPI Master's **MOSI** output directly to its **MISO** input:
+The simulation testbench creates a loopback by connecting MOSI directly to MISO.
 
 ```verilog
 assign miso = mosi;
 ```
 
-This configuration emulates a simple SPI slave, allowing transmitted data to be received back without requiring additional SPI devices.
+Simulation sequence:
 
-The simulation procedure is as follows:
+1. Apply reset.
+2. Configure CTRL register.
+3. Write TXDATA = 0xA5.
+4. Start SPI transfer.
+5. Wait until DONE becomes 1.
+6. Read RXDATA.
+7. Verify RXDATA equals 0xA5.
 
-1. Apply system reset.
-2. Configure the CTRL register with the desired clock divider.
-3. Write `0xA5` to the TXDATA register.
-4. Initiate an SPI transfer by setting the START bit.
-5. Wait for the transfer to complete.
-6. Read the STATUS register.
-7. Read the RXDATA register.
-8. Verify that the received byte matches the transmitted byte.
-
-A successful simulation produces the following result:
+Expected simulation output:
 
 ```text
-=== SPI Master Testbench ===
-Writing CTRL register...
-Writing TXDATA = 0xA5...
-Starting SPI transfer...
-Waiting for transfer to complete...
-Reading STATUS...
-Reading RXDATA...
-PASS: RXDATA == 0xA5
-=== Simulation Done ===
+===== SPI LOOPBACK TEST =====
+Writing TXDATA = 0xA5
+Starting transfer...
+Received RXDATA = 0xA5
+PASS
+Simulation complete.
 ```
 
-This confirms the correct operation of the register interface, SPI state machine, data shifting logic, and receive path.
+Successful simulation confirms:
+
+- Correct register interface
+- Proper SPI state machine operation
+- Correct MOSI transmission
+- Correct MISO sampling
+- Proper BUSY/DONE flag operation
+- Successful loopback communication
 
 ---
 
 # 11. Hardware Validation
 
-The SPI Master IP was successfully integrated into the VSDSquadron RISC-V SoC and programmed onto the VSDSquadron FPGA using the standard build flow.
+After RTL verification, the SPI Master IP was integrated into the VSDSquadron RISC-V SoC and programmed onto the FPGA.
+
+Build commands:
 
 ```bash
 make build
 make flash
 ```
 
-For FPGA validation, the SPI Master was configured with an **internal MOSI-to-MISO loopback connection** within the SoC design. This allows transmitted SPI data to be internally routed back to the receive path, eliminating the need for an external SPI slave device or jumper wire during hardware testing.
+Hardware setup:
 
-Software running on the RISC-V processor accesses the SPI Master through its memory-mapped register interface located at base address **0x400040**. The demonstration application performs the following operations:
+- VSDSquadron FPGA Board
+- CH340 USB-to-UART module
+- MOSI-to-MISO jumper wire
 
-1. Enables the SPI Master.
-2. Configures the SPI clock divider.
-3. Writes the transmit byte (`0xA5`) to the TXDATA register.
-4. Initiates an SPI transfer.
-5. Polls the DONE status flag.
-6. Reads the received byte from the RXDATA register.
-7. Prints the received value over the UART interface.
+Hardware connection:
 
-The expected UART output is similar to:
+```
+              VSDSquadron FPGA
 
-```text
-SPI TEST START
-RX = 0x000000A5
-SPI TEST DONE
+       +----------------------------+
+
+ MOSI ----------------------------+
+                                   |
+                                   |
+ MISO <----------------------------+
+
+ SCLK ----------------------------->
+
+ CS_N ------------------------------>
+
+ UART TX --------------------------> CH340 RX
+
+ UART RX <-------------------------- CH340 TX
+
+ GND ------------------------------ GND
 ```
 
-Successful execution confirms:
+The demonstration software performs the following operations:
 
-- Correct memory-mapped register access
+1. Configures the SPI clock divider.
+2. Enables the SPI Master.
+3. Writes 0xA5 into TXDATA.
+4. Starts the SPI transfer.
+5. Polls the DONE flag.
+6. Reads RXDATA.
+7. Verifies the received byte.
+8. Prints the received value through UART.
+9. Toggles the onboard RGB LEDs continuously to indicate successful execution.
+
+Expected UART output:
+
+```text
+===== SPI LOOPBACK TEST =====
+Writing TXDATA = 0xA5
+Starting transfer...
+Received RXDATA = 0xA5
+PASS
+```
+
+The LEDs continue blinking after the successful SPI transaction, confirming that the processor continues executing the application after the SPI transfer completes.
+
+Successful hardware validation confirms:
+
+- Correct processor-to-SPI communication
+- Correct register read/write operations
 - Successful SPI transmission
-- Correct SPI reception through the internal loopback path
-- Proper operation of the BUSY and DONE status flags
-- Successful end-to-end integration of the SPI Master IP within the VSDSquadron RISC-V SoC
+- Successful SPI reception through MOSI-to-MISO loopback
+- Correct BUSY and DONE flag operation
+- Successful UART communication through CH340
+- Successful integration of the SPI Master IP into the VSDSquadron SoC
+
+---
 
 # 12. Integration Notes
 
-- The SPI Master supports only one active transfer at a time.
-- START requests issued while BUSY is asserted are ignored.
-- Undefined register accesses return zero.
-- Undefined write operations are ignored.
-- The START bit is automatically cleared by hardware after a transfer begins.
-- BUSY and DONE are generated entirely by hardware.
+- Supports SPI Mode 0 only.
+- Supports only 8-bit transfers.
+- Only one transfer can be active at a time.
+- START requests while BUSY is asserted are ignored.
+- START automatically clears after a transfer begins.
+- BUSY and DONE are generated by hardware.
+- DONE is cleared using a write-one-to-clear operation.
+- Undefined register writes are ignored.
+- Undefined register reads return zero.
 
 ---
 
 # 13. Directory Structure
 
 ```
-ip/
-└── spi_master/
-    ├── rtl/
-    │   └── spi_master.v
-    ├── software/
-    │   └── spi_test.c
-    ├── test/
-    │   └── spi_master_tb.v
-    ├── docs/
-    │   ├── IP_User_Guide.md
-    │   ├── Register_Map.md
-    │   ├── Integration_Guide.md
-    │   └── Example_Usage.md
-    └── README.md
+spi_master/
+├── RTL/
+│   └── spi_master.v
+├── software/
+│   └── spi_test.c
+├── docs/
+│   ├── IP_User_Guide.md
+│   ├── Register_Map.md
+│   ├── Integration_Guide.md
+│   └── Example_Usage.md
+├── screenshots 
+└── README.md
 ```
+
+---
+
+# 14. Summary
+
+The SPI Master IP was successfully integrated into the VSDSquadron RISC-V SoC as a memory-mapped peripheral supporting SPI Mode 0 communication. The design was validated through RTL simulation using a MOSI-to-MISO loopback and subsequently verified on FPGA hardware using a jumper-wire loopback and a CH340 USB-to-UART interface. The successful transmission and reception of the test byte (0xA5), UART output, and continuous RGB LED activity confirm the correct functionality of the SPI Master IP and its integration with the RISC-V processor.
