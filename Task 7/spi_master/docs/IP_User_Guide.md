@@ -2,179 +2,362 @@
 
 **Version:** 1.0  
 **Target Platform:** VSDSquadron FPGA SoC  
+**Author:** Urvika Jadiya  
 **Date:** July 2026
+
+---
+
+# Table of Contents
+
+1. Introduction
+2. Features
+3. System Overview
+4. Architecture
+5. Register Map
+6. Register Description
+7. Operating Principle
+8. SPI Timing
+9. Hardware Interface
+10. Software Flow
+11. Validation
+12. Hardware Demonstration
+13. Performance
+14. Limitations
+15. Applications
+16. Future Improvements
 
 ---
 
 # 1. Introduction
 
-The SPI Master IP is a lightweight, memory-mapped peripheral designed for integration with the VSDSquadron RISC-V SoC. It provides a simple and configurable interface for transmitting and receiving 8-bit data over the Serial Peripheral Interface (SPI) using **SPI Mode 0 (CPOL = 0, CPHA = 0)**.
+The SPI Master IP is a lightweight, memory-mapped peripheral designed for integration with the VSDSquadron RISC-V System-on-Chip. It provides an efficient interface for transmitting and receiving 8-bit data using the Serial Peripheral Interface (SPI) protocol operating in **Mode 0 (CPOL = 0, CPHA = 0)**.
 
-The peripheral is intended for educational, prototyping, and embedded applications where a minimal SPI controller is sufficient. Software running on the RISC-V processor controls the peripheral entirely through memory-mapped registers.
+The peripheral is fully controlled through memory-mapped registers, allowing software executing on the RISC-V processor to configure the SPI clock, initiate transfers, monitor status, and retrieve received data.
 
-The SPI Master supports one transfer at a time and automatically manages the SPI clock (SCLK), chip-select (CS_N), and transfer status.
+The design focuses on simplicity, making it ideal for educational FPGA platforms, embedded applications, and custom SoC development.
 
 ---
 
 # 2. Features
 
 - Memory-mapped 32-bit register interface
-- SPI Mode 0 operation (CPOL = 0, CPHA = 0)
-- Full-duplex 8-bit data transfers
+- SPI Mode 0 (CPOL = 0, CPHA = 0)
+- Full-duplex 8-bit communication
 - Programmable SPI clock divider
-- Automatic chip-select (CS_N) control
-- Hardware-generated BUSY and DONE status flags
-- Software-controlled transfer initiation
-- Simple integration into the VSDSquadron RISC-V SoC
+- Automatic Chip Select (CS_N) generation
+- Hardware-managed BUSY and DONE flags
+- Auto-clearing START bit
+- One transaction at a time
+- Easy integration with the VSDSquadron RISC-V SoC
 
 ---
 
-# 3. Functional Overview
-
-The SPI Master IP acts as a bridge between the RISC-V processor and SPI-compatible peripherals.
-
-Software writes a transmit byte into the transmit register, configures the SPI clock divider, enables the peripheral, and starts the transfer. During the transfer, the SPI Master shifts data out through the **MOSI** line while simultaneously sampling data on the **MISO** line.
-
-Once all eight bits have been transmitted and received, the hardware:
-
-- Stores the received byte in the receive register
-- Clears the BUSY flag
-- Sets the DONE flag
-- Releases the chip-select signal
-
-The processor can then read the received byte and initiate another transfer.
-
----
-
-# 4. Block Diagram
+# 3. System Overview
 
 ```
-                 +-----------------------------+
-                 |      RISC-V Processor       |
-                 +-------------+---------------+
-                               |
+                +---------------------------+
+                |      RISC-V Processor     |
+                +-------------+-------------+
+                              |
                      Memory-Mapped Bus
-                               |
-                 +-------------v---------------+
-                 |        SPI Master IP        |
-                 |                             |
-                 |  Register Interface         |
-                 |  Control Logic              |
-                 |  Clock Divider              |
-                 |  Shift Registers            |
-                 |  Status Logic               |
-                 +------+------+------+--------+
-                        |      |      |
-                     MOSI    MISO   SCLK
-                        |
-                      CS_N
+                              |
+                +-------------v-------------+
+                |       SPI Master IP       |
+                +------+------+------+------+
+                       |      |      |
+                     MOSI   MISO    SCLK
+                       |
+                     CS_N
 ```
 
+The processor communicates with the SPI Master entirely through memory-mapped registers.
+
+Software writes data into the transmit register, starts a transfer, waits for completion, and reads back the received byte.
+
 ---
 
-# 5. Operating Principle
+# 4. Architecture
 
-The SPI Master performs a complete SPI transaction using the following sequence:
+The SPI Master IP consists of the following functional blocks:
 
-1. Software writes the transmit byte into the TXDATA register.
-2. Software configures the clock divider in the CTRL register.
-3. Software enables the SPI Master by setting the EN bit.
-4. Software starts the transfer by setting the START bit.
+- Register Interface
+- Control FSM
+- Clock Divider
+- Transmit Shift Register
+- Receive Shift Register
+- Status Register Logic
+- SPI Signal Generator
+
+The clock divider generates the SPI serial clock while the control FSM manages the complete transfer sequence.
+
+---
+
+# 5. Register Map
+
+| Offset | Register | Access | Description |
+|---------|----------|--------|-------------|
+| 0x00 | CTRL | R/W | Enable, Start, Clock Divider |
+| 0x04 | TXDATA | W | Transmit Data |
+| 0x08 | RXDATA | R | Received Data |
+| 0x0C | STATUS | R/W | Busy and Done Flags |
+
+---
+
+# 6. Register Description
+
+## CTRL Register (0x00)
+
+| Bit | Name | Description |
+|-----|------|-------------|
+|0|EN|Enable SPI Master|
+|1|START|Start Transfer (Auto-clears internally)|
+|15:8|CLKDIV|SPI Clock Divider|
+
+---
+
+## TXDATA Register (0x04)
+
+| Bits | Description |
+|------|-------------|
+|7:0|Transmit Byte|
+
+Writing to this register loads the transmit shift register.
+
+---
+
+## RXDATA Register (0x08)
+
+| Bits | Description |
+|------|-------------|
+|7:0|Received Byte|
+
+Contains the byte received during the most recent SPI transaction.
+
+---
+
+## STATUS Register (0x0C)
+
+| Bit | Name | Description |
+|-----|------|-------------|
+|0|BUSY|SPI Transfer in Progress|
+|1|DONE|Transfer Complete (Write 1 to Clear)|
+
+---
+
+# 7. Operating Principle
+
+A complete SPI transaction proceeds as follows:
+
+1. Software writes the transmit byte into TXDATA.
+2. Software configures the desired SPI clock divider.
+3. Software enables the SPI peripheral.
+4. Software asserts the START bit.
 5. The SPI Master automatically:
-   - Drives CS_N low
-   - Generates the SPI clock
-   - Shifts data through MOSI
-   - Samples data from MISO
-6. After eight clock cycles:
-   - CS_N returns high
-   - BUSY is cleared
-   - DONE is asserted
-   - Received data is stored in RXDATA
+   - Drives CS_N low.
+   - Generates the SPI clock.
+   - Shifts data out on MOSI.
+   - Samples data on MISO.
+6. After eight bits:
+   - CS_N returns high.
+   - BUSY clears.
+   - DONE is asserted.
+   - RXDATA is updated.
+7. Software reads RXDATA.
+8. Software clears DONE by writing a 1 to STATUS[1].
 
-Software then reads RXDATA and clears the DONE flag before initiating another transfer.
+The START bit is automatically cleared by hardware once the transfer begins.
+
+If START is asserted while BUSY is high, the request is ignored until the current transfer completes.
 
 ---
 
-# 6. SPI Timing
+# 8. SPI Timing
 
-The SPI Master implements **SPI Mode 0**, which has the following characteristics:
+The SPI Master operates in **SPI Mode 0**.
 
 | Parameter | Value |
 |-----------|-------|
 | CPOL | 0 |
 | CPHA | 0 |
-| Idle Clock State | Low |
-| Data Sample | Rising edge |
-| Data Shift | Falling edge |
+| Clock Idle State | Low |
+| Data Sample | Rising Edge |
+| Data Shift | Falling Edge |
 
-The SPI clock frequency is determined by the programmable clock divider:
+SPI clock frequency:
 
 ```
-SCLK Frequency = System Clock / (2 × (CLKDIV + 1))
+SCLK = System Clock / (2 × (CLKDIV + 1))
+```
+
+Example:
+
+System Clock = **12 MHz**
+
+CLKDIV = **2**
+
+```
+SCLK = 12 MHz / (2 × (2 + 1))
+
+SCLK = 2 MHz
 ```
 
 ---
 
-# 7. Software Operation
-
-A complete SPI transaction consists of the following software sequence:
-
-1. Write the transmit byte to **TXDATA**.
-2. Configure **CTRL**:
-   - Enable the peripheral (EN = 1)
-   - Set the desired CLKDIV value
-3. Set **START = 1**.
-4. Poll **STATUS.DONE** until it becomes **1**.
-5. Read **RXDATA**.
-6. Clear **DONE** by writing **1** to STATUS[1].
-
-The peripheral automatically clears the START bit once the transfer begins.
-
----
-
-# 8. Hardware Signals
+# 9. Hardware Interface
 
 | Signal | Direction | Description |
 |---------|-----------|-------------|
-| clk | Input | System clock |
-| resetn | Input | Active-low reset |
-| spi_sel | Input | Peripheral select from address decoder |
-| spi_addr | Input | Register address selector |
-| mem_wstrb | Input | Write enable |
-| mem_wdata | Input | Write data |
-| spi_rdata | Output | Read data |
-| sclk | Output | SPI serial clock |
+| clk | Input | System Clock |
+| resetn | Input | Active-Low Reset |
+| spi_sel | Input | Peripheral Select |
+| spi_addr | Input | Register Address |
+| mem_wstrb | Input | Write Enable |
+| mem_wdata | Input | Write Data |
+| spi_rdata | Output | Read Data |
+| sclk | Output | SPI Serial Clock |
 | mosi | Output | Master Out Slave In |
 | miso | Input | Master In Slave Out |
-| cs_n | Output | Active-low chip select |
+| cs_n | Output | Active-Low Chip Select |
 
 ---
 
-# 9. Validation
+# 10. Software Flow
 
-The SPI Master IP has been validated using:
+```
+Initialize SPI
 
-- RTL simulation
-- Memory-mapped software execution on the RISC-V processor
-The SPI Master IP has been validated using:
+↓
 
-• RTL simulation with a MOSI-to-MISO loopback connection in the testbench.
+Configure CLKDIV
 
-• Hardware implementation on the VSDSquadron FPGA using the integrated SPI data path within the SoC.
+↓
 
-The loopback configuration allows transmitted data to be received back without requiring an external SPI slave device.
+Write TXDATA
 
-Typical validation sequence:
+↓
+
+Set EN
+
+↓
+
+Set START
+
+↓
+
+Poll STATUS.DONE
+
+↓
+
+Read RXDATA
+
+↓
+
+Clear DONE
+
+↓
+
+Repeat
+```
+
+Typical software sequence:
+
+```c
+SPI_CTRL = (2<<8) | 0x01;
+
+SPI_TXDATA = 0xA5;
+
+SPI_CTRL = (2<<8) | 0x03;
+
+while((SPI_STATUS & 0x2) == 0);
+
+rx = SPI_RXDATA & 0xFF;
+
+SPI_STATUS = 0x2;
+```
+
+---
+
+# 11. Validation
+
+## RTL Simulation
+
+The SPI Master IP was verified using Verilator simulation.
+
+A loopback connection was created inside the testbench by connecting:
+
+```
+MISO = MOSI
+```
+
+Simulation sequence:
 
 - Write TXDATA = 0xA5
-- Start transfer
-- Wait until DONE = 1
+- Assert START
+- Poll DONE
 - Read RXDATA
-- Verify RXDATA = 0xA5
+
+Simulation Output:
+
+```
+===== SPI LOOPBACK TEST =====
+Writing TXDATA = 0xA5
+Starting transfer...
+Received RXDATA = 0xA5
+PASS
+```
+
+The received byte exactly matched the transmitted byte, confirming correct operation of the SPI transmit path, receive path, and register interface.
 
 ---
 
-# 10. Performance
+# 12. Hardware Demonstration
+
+The SPI Master IP was successfully implemented on the VSDSquadron FPGA.
+
+Hardware connections:
+
+- MOSI connected to MISO using a jumper wire to create a physical loopback.
+- UART TX and UART RX connected to a CH340 USB-to-UART converter for serial communication with the host PC.
+
+Demonstration sequence:
+
+1. FPGA configured successfully.
+2. Firmware initialized the SPI controller.
+3. TXDATA loaded with **0xA5**.
+4. START asserted.
+5. CS_N driven low automatically.
+6. SPI clock generated according to CLKDIV.
+7. Data transmitted over MOSI.
+8. Data looped back through the jumper into MISO.
+9. DONE asserted after completion.
+10. Firmware read RXDATA.
+11. UART displayed:
+
+```
+===== SPI LOOPBACK TEST =====
+Writing TXDATA = 0xA5
+Starting transfer...
+Received RXDATA = 0xA5
+PASS
+```
+
+12. Onboard LEDs toggled after each successful SPI transaction, providing a visual indication of completed data transfers.
+
+This demonstration verified:
+
+- Memory-mapped register access
+- SPI clock generation
+- MOSI transmission
+- MISO reception
+- Loopback communication
+- DONE flag generation
+- UART communication
+- Firmware integration
+- Hardware operation on FPGA
+
+---
+
+# 13. Performance
 
 | Parameter | Value |
 |-----------|-------|
@@ -186,41 +369,52 @@ Typical validation sequence:
 
 ---
 
-# 11. Limitations
+# 14. Limitations
 
-The current implementation has the following limitations:
+Current implementation supports:
 
-- Supports SPI Mode 0 only.
-- Supports only 8-bit transfers.
-- Only one SPI transaction can be active at a time.
-- No interrupt support; software polling is required.
-- No transmit or receive FIFO.
-- No multi-byte burst transfers.
-- Chip-select is automatically controlled by hardware.
+- SPI Mode 0 only
+- 8-bit transfers only
+- Single transaction at a time
+- Software polling
+- No interrupt support
+- No FIFO buffering
+- Automatic Chip Select generation
 
 ---
 
-# 12. Applications
+# 15. Applications
 
-The SPI Master IP is suitable for:
+This SPI Master IP can be used for:
 
-- Sensor interfacing
 - EEPROM communication
-- Flash memory access
-- ADC and DAC communication
-- Embedded system prototyping
-- FPGA laboratory exercises
-- Educational RISC-V SoC projects
+- SPI Flash memories
+- ADC interfaces
+- DAC interfaces
+- Temperature sensors
+- Accelerometers
+- Embedded FPGA systems
+- Educational RISC-V SoC platforms
+- Custom FPGA peripherals
 
 ---
 
-# 13. Related Documentation
+# 16. Future Improvements
 
-For additional information, refer to:
+Possible enhancements include:
 
-- **Register_Map.md** – Register definitions and bit fields
-- **Integration_Guide.md** – SoC integration procedure
-- **Example_Usage.md** – Software examples
-- **README.md** – Project overview
+- SPI Modes 1, 2, and 3
+- Configurable transfer lengths
+- Multi-byte burst transfers
+- Interrupt support
+- DMA interface
+- TX/RX FIFOs
+- Multiple chip-select outputs
+- Configurable bit ordering (MSB/LSB first)
+- Higher throughput support
 
 ---
+
+## Conclusion
+
+The SPI Master IP provides a compact, configurable, and reliable SPI controller for the VSDSquadron RISC-V SoC. Through memory-mapped control registers, programmable clock generation, automatic status management, and full-duplex communication, the design demonstrates a complete SPI solution suitable for FPGA-based embedded systems and educational SoC development. Validation through RTL simulation and FPGA hardware implementation confirms correct operation of both the hardware and software components.
