@@ -1,18 +1,18 @@
-# TASK 7 : Commercial-Grade SPI Master IP
+# Commercial-Grade SPI Master IP
 
-A lightweight, memory-mapped **SPI Master IP** for the **VSDSquadron RISC-V SoC**. The IP implements **SPI Mode 0 (CPOL = 0, CPHA = 0)** and supports **single-byte (8-bit) full-duplex SPI communication** with a programmable serial clock.
+A lightweight, memory-mapped **SPI Master IP** designed for the **VSDSquadron RISC-V SoC**. The IP implements **SPI Mode 0 (CPOL = 0, CPHA = 0)** and supports **8-bit full-duplex SPI communication** with a programmable serial clock.
 
 ---
 
 ## Features
 
 - Memory-mapped 32-bit register interface
-- SPI Mode 0 operation
-- 8-bit full-duplex data transfers
+- SPI Mode 0 (CPOL = 0, CPHA = 0)
+- 8-bit full-duplex transfers
 - Programmable SPI clock divider
-- Hardware-controlled BUSY and DONE status flags
-- Automatic Chip Select (CS_N) control
-- Compatible with the VSDSquadron FPGA platform
+- Hardware-controlled BUSY and DONE flags
+- Automatic Chip Select (CS_N) generation
+- Integrated into the VSDSquadron RISC-V SoC
 
 ---
 
@@ -31,28 +31,38 @@ A lightweight, memory-mapped **SPI Master IP** for the **VSDSquadron RISC-V SoC*
 
 ## Integration
 
-To integrate the SPI Master IP into the VSDSquadron SoC:
+Integrating the SPI Master IP into the SoC requires only a few steps:
 
 1. Add `rtl/spi_master.v` to the RTL project.
-2. Instantiate the SPI Master in the SoC top-level module.
-3. Decode the address range beginning at **0x400040** to generate `spi_sel`.
-4. Connect the processor bus signals (`clk`, `resetn`, `spi_addr`, `mem_wstrb`, `mem_wdata`, and `spi_rdata`).
-5. Connect the SPI interface signals (`sclk`, `mosi`, `miso`, and `cs_n`) according to the system requirements.
+2. Instantiate the SPI Master inside the SoC.
+3. Decode address **0x400040** to generate `spi_sel`.
+4. Connect the processor bus signals:
+   - `clk`
+   - `resetn`
+   - `spi_addr`
+   - `mem_wstrb`
+   - `mem_wdata`
+   - `spi_rdata`
+5. Connect the SPI interface:
+   - `sclk`
+   - `mosi`
+   - `miso`
+   - `cs_n`
 
-Detailed integration instructions are provided in **docs/Integration_Guide.md**.
+Complete integration details are available in **docs/Integration_Guide.md**.
 
 ---
 
 ## Documentation
 
-Additional documentation is available in the `docs/` directory:
+The complete documentation is located in the **docs/** directory.
 
 | Document | Description |
 |----------|-------------|
-| **IP_User_Guide.md** | Functional overview, architecture, and operating principles |
-| **Register_Map.md** | Register definitions, bit fields, and programming model |
-| **Integration_Guide.md** | SoC integration procedure and hardware validation |
-| **Example_Usage.md** | Example software and expected results |
+| **IP_User_Guide.md** | Architecture, functionality and operating principle |
+| **Register_Map.md** | Register descriptions and programming model |
+| **Integration_Guide.md** | RTL integration, address decoding and FPGA implementation |
+| **Example_Usage.md** | Complete software example and validation procedure |
 
 ---
 
@@ -60,65 +70,69 @@ Additional documentation is available in the `docs/` directory:
 
 ### RTL Simulation
 
-Run the supplied testbench (`test/spi_master_tb.v`) to verify SPI functionality. The simulation uses a **MOSI-to-MISO loopback** connection within the testbench to validate SPI transmission and reception.
+The supplied firmware performs an SPI loopback transfer by transmitting **0xA5** and verifying the received byte.
 
-Expected result:
+Expected console output:
 
 ```text
-PASS: RXDATA == 0xA5
+===== SPI LOOPBACK TEST =====
+Writing TXDATA = 0xA5
+Starting transfer...
+Received RXDATA = 0xA5
+PASS
 ```
+
+---
 
 ### FPGA Validation
 
-Program the VSDSquadron FPGA using the standard build flow:
+Program the FPGA using:
 
 ```bash
 make build
 make flash
 ```
 
-Run the example software located in `software/spi_test.c`.
+After connecting the CH340 UART interface and SPI loopback wiring (MOSI ↔ MISO), the firmware performs the same SPI transfer on hardware and reports the received byte over UART.
 
 Expected UART output:
 
 ```text
-SPI TEST START
-RX = 0x000000A5
-SPI TEST DONE
+===== SPI LOOPBACK TEST =====
+Writing TXDATA = 0xA5
+Starting transfer...
+Received RXDATA = 0xA5
+PASS
 ```
 
 ---
 
-## Directory Structure
+## Project Structure
 
 ```text
-ip/
-└── spi_master/
-    ├── rtl/
-    │   └── spi_master.v
-    ├── software/
-    │   └── spi_test.c
-    ├── docs/
-    │   ├── IP_User_Guide.md
-    │   ├── Register_Map.md
-    │   ├── Integration_Guide.md
-    │   └── Example_Usage.md
-    └── screenshots/
-    |   ├── placeholder.md
-    |   ├── ss14_b.png
-    |   ├── ss14_spi_test_c.png
-    |   ├── ss16_hex.png
-    |   ├── ss17_make_sim.png
-    |   ├── ss20_gtkwave.png
-    |   ├── ss27_make_flash.png
-    |   └── task7_tree.png
-    └── README.md
+spi_master/
+├── rtl/
+│   └── spi_master.v
+├── software/
+│   └── spi_test.c
+├── docs/
+│   ├── IP_User_Guide.md
+│   ├── Register_Map.md
+│   ├── Integration_Guide.md
+│   └── Example_Usage.md
+├── screenshots/
+│   ├── step3_a.png
+│   ├── step3_b.png
+│   ├── step3_c.png
+│   ├── step3_d.png
+│   ├── ss20_gtkwave.png
+│   ├── ss27_make_flash.png
+│   └── board.png
+└── README.md
 ```
-## Terminal Verification
-![](screenshots/task7_tree.png)
 
 ---
 
 ## License
 
-This project was developed as part of the **VSDSquadron FPGA IP Development Program**.
+Developed as part of the **VSDSquadron FPGA IP Development Program**.
