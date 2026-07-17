@@ -1,183 +1,267 @@
 # SPI Master IP – Example Usage
 
 **Version:** 1.0  
-**Target Platform:** VSDSquadron FPGA SoC
+**Target Platform:** VSDSquadron FPGA SoC  
+**SPI Mode:** Mode 0 (CPOL = 0, CPHA = 0)
 
 ---
 
-# 1. Overview
+# Overview
 
-This document provides a reference software example demonstrating the use of the SPI Master IP on the VSDSquadron RISC-V SoC. The example performs a single 8-bit SPI transaction by transmitting the byte 0xA5, waiting for transfer completion, and reading the received byte through the memory-mapped register interface. The example application performs a single 8-bit SPI transfer by transmitting the byte `0xA5` and reading the received byte through the memory-mapped register interface.
+This document demonstrates how to use the SPI Master IP integrated into the VSDSquadron RISC-V SoC. The example application configures the SPI peripheral, performs an 8-bit SPI transfer, waits for completion, verifies the received data, and indicates successful operation through both the UART console and onboard LEDs.
 
-The application also prints the received value over the UART interface to verify correct SPI operation.
+The firmware transmits the byte **0xA5**. During hardware validation, the SPI Master communicates through a loopback connection (MOSI connected to MISO), allowing the transmitted byte to be received back without requiring an external SPI slave device.
 
 ---
 
-# 2. Memory Map
+# Example Demonstration
+
+The example performs the following operations:
+
+1. Configure the SPI clock divider.
+2. Enable the SPI Master.
+3. Load the transmit byte (`0xA5`) into the TXDATA register.
+4. Start the SPI transaction.
+5. Poll the DONE flag until the transfer completes.
+6. Read the received byte from RXDATA.
+7. Verify that the received byte matches the transmitted byte.
+8. Continuously toggle the onboard LEDs to indicate successful execution.
+
+---
+
+# Memory-Mapped Registers
 
 | Register | Address |
-|----------|----------|
-| CTRL | `0x400040` |
-| TXDATA | `0x400044` |
-| RXDATA | `0x400048` |
-| STATUS | `0x40004C` |
+|-----------|----------|
+| CTRL | 0x400040 |
+| TXDATA | 0x400044 |
+| RXDATA | 0x400048 |
+| STATUS | 0x40004C |
 
 ---
 
-# 3. Example Software
+# Firmware
 
-```c
-#include <stdint.h>
+The example firmware communicates with the SPI Master using memory-mapped I/O registers.
 
-#define IO_BASE 0x400000
-#define UART_DATA  (*(volatile uint32_t *)(IO_BASE + 0x08))
-#define UART_CTRL  (*(volatile uint32_t *)(IO_BASE + 0x10))
-#define SPI_CTRL   (*(volatile uint32_t *)(0x400040))
-#define SPI_TXDATA (*(volatile uint32_t *)(0x400044))
-#define SPI_RXDATA (*(volatile uint32_t *)(0x400048))
-#define SPI_STATUS (*(volatile uint32_t *)(0x40004C))
+### Firmware Source
 
-void uart_putchar(char c)
-{
-    while(UART_CTRL & (1<<9));
-    UART_DATA = c;
-}
+![Firmware Source](../screenshots/step3_a.png)
 
-void uart_print(char *s)
-{
-    while(*s)
-        uart_putchar(*s++);
-}
+![Firmware Source](../screenshots/step3_b.png)
 
-void uart_print_hex(uint32_t x)
-{
-    char hex[] = "0123456789ABCDEF";
-
-    uart_print("0x");
-
-    for(int i = 28; i >= 0; i -= 4)
-        uart_putchar(hex[(x >> i) & 0xF]);
-
-    uart_putchar('\n');
-}
-
-int main()
-{
-    uart_print("SPI TEST START  ");
-
-    SPI_CTRL = (1 << 0) | (2 << 8);
-
-    SPI_TXDATA = 0xA5;
-
-    SPI_CTRL |= (1 << 1);
-
-    while(!(SPI_STATUS & (1 << 1)));
-
-    uart_print("RX = ");
-    uart_print_hex(SPI_RXDATA);
-
-    uart_print("SPI TEST DONE  ");
-
-    while(1);
-
-    return 0;
-}
-```
+The application performs the complete SPI transaction followed by continuous LED blinking to indicate successful execution.
 
 ---
 
-# 4. Software Execution Flow
+# Building the Firmware
 
-The example performs the following sequence:
+Compile the firmware from the Firmware directory:
 
-1. Initializes the SPI Master by enabling the peripheral and configuring the SPI clock divider.
-2. Writes the transmit byte (`0xA5`) into the `TXDATA` register.
-3. Starts an SPI transfer by setting the `START` bit in the `CTRL` register.
-4. Waits until the hardware sets the `DONE` status flag.
-5. Reads the received byte from the `RXDATA` register.
-6. Prints the received value over the UART interface.
-
----
-
-# 5. Expected UART Output
-
-A successful execution produces output similar to:
-
-```text
-SPI TEST START
-RX = 0x000000A5
-SPI TEST DONE
-```
-
----
-
-# 6. Expected Register Activity
-
-| Step | Register | Value |
-|------|----------|-------|
-| Configure SPI | CTRL | `0x00000201` |
-| Load transmit data | TXDATA | `0x000000A5` |
-| Start transfer | CTRL | `0x00000203` |
-| Wait for completion | STATUS | `DONE = 1` |
-| Read received data | RXDATA | `0x000000A5` |
-
----
-
-# 7. Verification
-
-Successful execution of this example verifies:
-
-- Correct access to the SPI Master through the memory-mapped bus interface.
-- Successful transmission of an 8-bit data frame.
-- Successful reception of the transmitted data.
-- Correct operation of the BUSY and DONE status flags.
-- Proper interaction between the RISC-V software and the SPI Master peripheral.
-
-During RTL simulation, the SPI receive path is verified using a testbench loopback (`assign miso = mosi;`).
-
-During FPGA implementation, the SPI receive path is validated through the internal loopback connection integrated within the SoC design.
+Successful compilation generates the firmware ELF and HEX images.
 
 ### Firmware Compilation
 
-The example application was compiled successfully to generate the firmware image.
-
-![Firmware Compilation](../screenshots/ss14_spi_test_c.png)
-![Firmware Compilation](../screenshots/ss14_b.png)
+![Firmware Compilation](../screenshots/step3_c.png)
 
 ---
 
-### Firmware HEX Generation
+# Running RTL Simulation
 
-The compiled ELF file was successfully converted into a HEX file for SoC memory initialization.
+After compiling the firmware, run the RTL simulation.
 
-![HEX Generation](../screenshots/ss16_hex.png)
+```bash
+cd ../RTL
+make sim
+```
+
+The simulator executes the firmware on the RISC-V processor while interacting with the SPI Master peripheral.
+
+### Simulation Output
+
+![Simulation](../screenshots/step3_d.png)
+
+The expected console output is:
+
+```
+===== SPI LOOPBACK TEST =====
+
+Writing TXDATA = 0xA5
+
+Starting transfer...
+
+Received RXDATA = 0xA5
+
+PASS
+```
+
+The PASS message confirms that:
+
+- TXDATA was transmitted correctly.
+- The SPI state machine completed successfully.
+- The received byte matched the transmitted byte.
+- The DONE flag was asserted after transfer completion.
 
 ---
 
-### RTL Simulation
+# Waveform Verification
 
-RTL simulation completed successfully, and the transmitted byte (`0xA5`) was correctly received through the SPI loopback path.
+The simulation also generates a VCD waveform that can be viewed using GTKWave.
 
-![Simulation Output](../screenshots/ss17_make_sim.png)
+```bash
+gtkwave spi_master_tb.vcd
+```
 
----
-
-### Waveform Verification
-
-GTKWave confirms correct SPI timing, data shifting, and successful reception of the transmitted byte.
+### GTKWave Verification
 
 ![GTKWave](../screenshots/ss20_gtkwave.png)
 
+The waveform confirms:
+
+- Chip Select (CS_N) is asserted during the transfer.
+- SCLK is generated correctly.
+- MOSI shifts out the byte `0xA5`.
+- MISO receives the same byte through loopback.
+- BUSY remains asserted during transmission.
+- DONE becomes high after completion.
+- RXDATA stores `0xA5`.
+
 ---
+
+# Programming the FPGA
+
+Generate the FPGA bitstream and flash the board.
+
+```bash
+make build
+
+make flash
+```
+
+After programming:
+
+- the RISC-V processor boots automatically,
+- the firmware executes,
+- the SPI transaction is performed,
+- UART prints the received byte,
+- the LEDs begin toggling continuously.
 
 ### FPGA Programming
 
-The generated bitstream was successfully programmed onto the VSDSquadron FPGA, completing hardware validation of the SPI Master IP.
+![FPGA Programming](../screenshots/ss27_make_flash.png)
 
-![FPGA Flash](../screenshots/ss27_make_flash.png)
+---
 
-# 8. Notes
+# Hardware Setup
 
-- This example demonstrates a single 8-bit SPI transaction.
-- The software uses polling to wait for transfer completion.
-- The example is intended as a simple reference application for validating the SPI Master IP on the VSDSquadron FPGA platform.
+The hardware validation uses the VSDSquadron FPGA board.
+
+Connect:
+
+- CH340 USB-UART converter
+- SPI loopback connection (MOSI ↔ MISO)
+- USB power
+
+### Hardware Setup
+
+![Board Setup](../screenshots/board.png)
+
+---
+
+# Expected UART Output
+
+A successful execution produces output similar to:
+
+```
+===== SPI LOOPBACK TEST =====
+
+Writing TXDATA = 0xA5
+
+Starting transfer...
+
+Received RXDATA = 0xA5
+
+PASS
+```
+
+---
+
+# LED Behaviour
+
+After the SPI transaction completes successfully, the firmware enters an infinite loop that continuously toggles the onboard LEDs.
+
+This provides a simple visual indication that:
+
+- firmware execution is active,
+- the processor is running,
+- the SPI transfer completed successfully,
+- the program reached the final application loop.
+
+---
+
+# Complete Software Flow
+
+```
+Reset
+
+↓
+
+Enable SPI
+
+↓
+
+Configure Clock Divider
+
+↓
+
+Write TXDATA = 0xA5
+
+↓
+
+START = 1
+
+↓
+
+Poll DONE
+
+↓
+
+Read RXDATA
+
+↓
+
+Verify RXDATA == 0xA5
+
+↓
+
+Print PASS
+
+↓
+
+Blink LEDs Forever
+```
+
+---
+
+# Example Result
+
+| Item | Result |
+|-------|--------|
+| SPI Configuration | Successful |
+| TXDATA Written | 0xA5 |
+| Transfer Started | Yes |
+| DONE Flag | Asserted |
+| RXDATA | 0xA5 |
+| Verification | PASS |
+| UART Output | Correct |
+| LED Indication | Successful |
+| RTL Simulation | Passed |
+| FPGA Validation | Passed |
+
+---
+
+# Conclusion
+
+This example demonstrates the complete software workflow for operating the SPI Master IP. The RISC-V processor configures the peripheral through its memory-mapped registers, initiates an SPI transfer, receives the transmitted byte through a loopback connection, verifies the received data, and provides both UART and LED indications of successful operation.
+
+The same sequence can be extended to communicate with external SPI peripherals such as sensors, EEPROMs, Flash memories, ADCs, and DACs by replacing the loopback connection with the target SPI device.
