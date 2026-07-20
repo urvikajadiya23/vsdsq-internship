@@ -228,7 +228,7 @@ make flash
 Hardware setup:
 
 - VSDSquadron FPGA Board
-- CH340 USB-to-UART module
+- Cp2102 USB-to-UART module
 - MOSI-to-MISO jumper wire
 
 Hardware connection:
@@ -325,4 +325,4 @@ spi_master/
 
 # 14. Summary
 
-The SPI Master IP was successfully integrated into the VSDSquadron RISC-V SoC as a memory-mapped peripheral supporting SPI Mode 0 communication. The design was validated through RTL simulation using a MOSI-to-MISO loopback and subsequently verified on FPGA hardware using a jumper-wire loopback and a CH340 USB-to-UART interface. The successful transmission and reception of the test byte (0xA5), UART output, and continuous RGB LED activity confirm the correct functionality of the SPI Master IP and its integration with the RISC-V processor.
+The SPI Master IP was successfully integrated into the VSDSquadron RISC-V SoC as a memory-mapped peripheral supporting SPI Mode 0 communication. The design was validated through RTL simulation using a MOSI-to-MISO loopback and subsequently verified on FPGA hardware using a jumper-wire loopback and a CP2102 USB-to-UART interface. The successful transmission and reception of the test byte (0xA5), UART output, and continuous RGB LED activity confirm the correct functionality of the SPI Master IP and its integration with the RISC-V processor.
