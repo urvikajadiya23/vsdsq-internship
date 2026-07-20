@@ -317,7 +317,7 @@ The SPI Master IP was successfully implemented on the VSDSquadron FPGA.
 Hardware connections:
 
 - MOSI connected to MISO using a jumper wire to create a physical loopback.
-- UART TX and UART RX connected to a CH340 USB-to-UART converter for serial communication with the host PC.
+- UART TX and UART RX connected to a cp2102 USB-to-UART converter for serial communication with the host PC.
 
 Demonstration sequence:
 
