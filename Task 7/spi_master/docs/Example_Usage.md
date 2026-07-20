@@ -158,7 +158,7 @@ The hardware validation uses the VSDSquadron FPGA board.
 
 Connect:
 
-- CH340 USB-UART converter
+- Cp2102 USB-UART converter
 - SPI loopback connection (MOSI ↔ MISO)
 - USB power
 
