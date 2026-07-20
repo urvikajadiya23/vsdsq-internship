@@ -230,7 +230,7 @@ Validation sequence:
 5. Read RXDATA.
 6. Verify RXDATA = 0xA5.
 
-During FPGA validation, the MOSI and MISO pins were connected using a jumper wire to form a hardware loopback. UART messages were observed through a CH340 USB-to-UART interface, confirming successful SPI transactions and correct register operation.
+During FPGA validation, the MOSI and MISO pins were connected using a jumper wire to form a hardware loopback. UART messages were observed through a CP2102 USB-to-UART interface, confirming successful SPI transactions and correct register operation.
 
 ---
 
