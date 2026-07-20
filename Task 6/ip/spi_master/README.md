@@ -287,6 +287,7 @@ The corresponding physical pin numbers were appended to `VSDSquadronFM.pcf`:
 cat >> VSDSquadronFM.pcf << 'EOF'
 set_io  spi_sclk_pin 9
 set_io  spi_mosi_pin 10
+set_io  spi_miso_pin 11
 set_io  spi_cs_n_pin 12
 EOF
 ```
@@ -297,9 +298,9 @@ EOF
 sed -i 's/RXD 3set_io/RXD 3\nset_io/' VSDSquadronFM.pcf
 ```
 
-Final `VSDSquadronFM.pcf` correctly lists `RXD 3` on its own line, followed by the three SPI pin assignments each on their own line.
+Final `VSDSquadronFM.pcf` correctly lists `RXD 3` on its own line, followed by the four SPI pin assignments each on their own line.
 
-![PCF pin constraint edit](screenshots/ss22_modifying_pcf.png)
+![PCF pin constraint edit](screenshots/pcf.png)
 
 ---
 
