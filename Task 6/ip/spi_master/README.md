@@ -352,14 +352,14 @@ Bye.
 
 ![sudo make flash — VERIFY OK](screenshots/ss27_make_flash.png)
 
----
-Completion Pending: CH340 and jumper wires to be connected
+![](screenshots/board.png )
+
 ---
 
 ## Brief description of the task
 
 Designed and integrated a memory-mapped SPI Master IP into a custom RISC-V SoC on the VSDSquadron FPGA platform using Verilog RTL. The SPI controller supports 8-bit full-duplex communication in SPI Mode 0 (CPOL=0, CPHA=0) with configurable clock division and control/status registers accessible through the processor's memory-mapped bus.
-The IP implements CTRL, TXDATA, RXDATA, and STATUS registers, supporting features such as enable, start, busy, done, and software-clearable status flags. Functional verification was performed using Verilator simulation with MOSI-to-MISO loopback, successfully transmitting and receiving the test byte 0xA5. The design was synthesized, programmed onto the FPGA, and validated through UART-based debug messages and onboard LED indications, demonstrating successful hardware integration with the RISC-V system.
+The IP implements CTRL, TXDATA, RXDATA, and STATUS registers, supporting features such as enable, start, busy, done, and software-clearable status flags. Functional verification was performed using Verilator simulation with MOSI-to-MISO loopback, successfully transmitting and receiving the test byte 0xA5. The design was synthesized, programmed onto the FPGA, demonstrating successful hardware integration with the RISC-V system.
 Technologies Used
 Verilog HDL
 RISC-V SoC Integration
@@ -369,6 +369,6 @@ Verilator
 Yosys
 nextpnr-ice40
 VSDSquadron FPGA
-
+cp2102
 ---
 
